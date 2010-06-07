@@ -1141,3 +1141,31 @@ r_clean:
 	rm -f *.@OBJEXT@ *@SO@ NAMESPACE
 	rm -f $(RRSRC) runme.Rout .RData
 
+##################################################################
+#####                      FORTRAN                          ######
+##################################################################
+
+F77=@F77@
+CLIBPREFIX = lib
+#C_SO = @C_SO@
+#C_LDSHARED = @C_LDSHARED@
+#CXX_LDSHARED = @CXX_LDSHARED@
+
+
+fortran: $(SRCS)
+	$(SWIG) -fortran $(SWIGOPT) $(INTERFACEPATH)
+	$(CC) -c $(CCSHARED) $(CFLAGS) $(ISRCS) $(INCLUDES) $(SRCS) 
+	$(LDSHARED) $(CFLAGS) $(OBJS) $(IOBJS) $(LIBS) -o $(CLIBPREFIX)$(TARGET)$(SO)
+
+fortran_cpp: $(SRCS)
+	$(SWIG) -c++ -fortran $(SWIGOPT) $(INTERFACEPATH)
+	$(CXX) -c $(CCSHARED) $(CFLAGS) $(ICXXSRCS) $(SRCS) $(CXXSRCS) $(INCLUDES) 
+	$(CXXSHARED) $(CFLAGS) $(OBJS) $(IOBJS) $(LIBS) $(CPP_DLLIBS) -o $(CLIBPREFIX)$(TARGET)$(SO)
+
+fortran_compile: $(RUNME) $(PROXY)
+	$(F77) $(RUNME) $(PROXY) -L. -l$(TARGET) -o $(RUNME:.f=)
+
+fortran_clean:
+	rm -f *_wrap* *~ .~*
+	rm -f core @EXTRA_CLEAN@
+	rm -f *.@OBJEXT@ *@SO@

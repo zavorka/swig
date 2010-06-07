@@ -32,6 +32,7 @@ extern "C" {
   Language *swig_python(void);
   Language *swig_perl5(void);
   Language *swig_ruby(void);
+  Language *swig_fortran(void);
   Language *swig_guile(void);
   Language *swig_modula3(void);
   Language *swig_mzscheme(void);
@@ -69,6 +70,7 @@ static swig_module modules[] = {
   {"-clisp", swig_clisp, "CLISP"},
   {"-cffi", swig_cffi, "CFFI"},
   {"-csharp", swig_csharp, "C#"},
+  {"-fortran", swig_fortran, "FORTRAN"},
   {"-guile", swig_guile, "Guile"},
   {"-java", swig_java, "Java"},
   {"-lua", swig_lua, "Lua"},

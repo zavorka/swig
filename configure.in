@@ -1951,6 +1951,29 @@ fi
 AC_SUBST(RBIN)
 
 #----------------------------------------------------------------
+# Look for Fortran 77
+#----------------------------------------------------------------
+
+F77=
+
+AC_ARG_WITH(f77, AS_HELP_STRING([--without-f77], [Disable Fortran 77])
+AS_HELP_STRING([--with-f77=path], [Set location of Fortran 77 Compiler (f77)]),[ F77="$withval"], [F77=yes])
+
+# First, check for "--without-f77" or "--with-f77=no".
+if test x"${F77}" = xno -o x"${with_alllang}" = xno ; then 
+AC_MSG_NOTICE([Disabling Fortran 77])
+F77=
+else
+
+# can we find F77?
+if test "x$F77" = xyes; then
+   AC_PATH_PROGS(F77, gfortran g77 f77)
+fi
+fi
+
+AC_SUBST(F77)
+
+#----------------------------------------------------------------
 # Determine which languages to use for examples/test-suite
 #----------------------------------------------------------------
 
