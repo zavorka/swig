@@ -69,7 +69,7 @@ INCLUDES   = -I$(top_srcdir)/$(EXAMPLES)/$(TEST_SUITE)
 LIBS       = -L.
 LIBPREFIX  = lib
 ACTION     = check
-INTERFACEDIR = ../
+INTERFACEDIR = $(top_srcdir)/$(EXAMPLES)/$(TEST_SUITE)/
 
 #
 # Please keep test cases in alphabetical order.
@@ -180,6 +180,7 @@ CPP_TEST_CASES += \
 	disown \
 	dynamic_cast \
 	empty \
+	enum_rename \
 	enum_scope_template \
 	enum_template \
 	enum_thorough \
@@ -200,6 +201,7 @@ CPP_TEST_CASES += \
 	features \
 	fragments \
 	friends \
+	funcptr_cpp \
 	fvirtual \
 	global_namespace \
 	global_ns_arg \
