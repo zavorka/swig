@@ -5,33 +5,29 @@
  * fortran.swg
  * ----------------------------------------------------------------------------- */ 
 
-// WARNING: passing function pointers from C as parameters of type (or as
-// return values) SWIGTYPE (CLASS::*) causes cast of C function to type
-// void(*)() and it is user's responsibility to properly handle this 
-// function's arguments and return value. See 'cpp_basic' test for details.
-
-//%insert("runtime") "clabels.swg"
-//%insert("proxy_header") "cproxy.swg"
-
 %insert("runtime") %{
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 %}
 
-%typemap(in) int, float, double "$1 = *$input;"
+%typemap(in, replaceparm="$type *$input", noblock=1) int, float, double {
+    $1 = *$input;
+}
 %typemap(in) char "$1 = $input;"
 %typemap(in) int *, float *, double * "$1 = $input;"
-%typemap(in) char * "$1 = null_terminate($input, $length);"
+%typemap(in, extraparm="size_t $1_len", noblock=1) char * {
+    $1 = Swig_null_terminate($input, $1_len);
+}
 
 // %typemap(argout) int, float, double "*$output = $input;"
 %typemap(argout, noblock=1) char * {
-    fortranify($input, $output, $length);
-    free($input);
+    Swig_fortranify($1, $input, $1_len);
+    free($1);
 }
 
 %insert(runtime) %{
-char* null_terminate(char* inStr, int len) {
+char* Swig_null_terminate(char* inStr, int len) {
     int retVal = 0;
     char* newStr = NULL;
     char* current = NULL;
@@ -69,7 +65,7 @@ char* null_terminate(char* inStr, int len) {
 %}
 
 %insert(runtime) %{
-void fortranify(const char* inBuff, char* retText, int retTextLen) {
+void Swig_fortranify(const char* inBuff, char* retText, int retTextLen) {
 
     int inBuffLen = 0;
     int i = 0;

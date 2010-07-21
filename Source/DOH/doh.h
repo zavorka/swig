@@ -99,6 +99,7 @@
 #define DohStrncmp         DOH_NAMESPACE(Strncmp)
 #define DohStrstr          DOH_NAMESPACE(Strstr)
 #define DohStrchr          DOH_NAMESPACE(Strchr)
+#define DohStrrchr         DOH_NAMESPACE(Strrchr)
 #define DohNewFile         DOH_NAMESPACE(NewFile)
 #define DohNewFileFromFile DOH_NAMESPACE(NewFileFromFile)
 #define DohNewFileFromFd   DOH_NAMESPACE(NewFileFromFd)
@@ -283,6 +284,7 @@ extern int DohStrcmp(const DOHString_or_char *s1, const DOHString_or_char *s2);
 extern int DohStrncmp(const DOHString_or_char *s1, const DOHString_or_char *s2, int n);
 extern char *DohStrstr(const DOHString_or_char *s1, const DOHString_or_char *s2);
 extern char *DohStrchr(const DOHString_or_char *s1, int ch);
+extern char *DohStrrchr(const DOHString_or_char *s1, int ch);
 
 /* String replacement flags */
 
@@ -419,6 +421,7 @@ extern void DohMemoryDebug(void);
 #define Strncmp            DohStrncmp
 #define Strstr             DohStrstr
 #define Strchr             DohStrchr
+#define Strrchr            DohStrrchr
 #define Copyto             DohCopyto
 #define Split              DohSplit
 #define SplitLines         DohSplitLines

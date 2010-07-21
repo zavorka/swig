@@ -1,3 +1,19 @@
+/* -----------------------------------------------------------------------------
+ * This file is part of SWIG, which is licensed as a whole under version 3-
+ * (or any later version) of the GNU General Public License. Some additional
+ * terms also apply to certain portions of SWIG. The full details of the SWIG
+ * license and copyrights can be found in the LICENSE and COPYRIGHT files
+ * included with the SWIG source code as distributed by the SWIG developers
+ * and at http://www.swig.org/legal.html.
+ *
+ * fortran.cxx
+ *
+ * Fortran language module for SWIG.
+ * ----------------------------------------------------------------------------- */
+
+char cvsroot_fortran_cxx[] = "$Id:$";
+
+
 #include "swigmod.h"
 
 class FORTRAN:public Language {
@@ -104,161 +120,45 @@ int FORTRAN::top(Node *n) {
   return SWIG_OK;
 }
 
-Parm *getFirstParm(ParmList *p) {
-  Parm *r = p;
-  while (p) {
-    p = previousSibling(p);
-    if (p) {
-      r = p;
-    }
-  }
-  return r;
-}
-
-Parm *getLastParm(ParmList *p) {
-  Parm *r = p;
-  while (p) {
-    p = nextSibling(p);
-    if (p) {
-      r = p;
-    }
-  }
-  return r;
-}
-
-String *parmListAsString(ParmList *parm) {
-  String *ret = NewString("");
-  Parm *p = parm;
-  while (p) {
-    String *pstr = Getattr(p, "name");
-    Append(ret, pstr);
-    Delete(pstr);
-    p = nextSibling(p);
-    if (p) {
-      Append(ret, ", ");
-    }
-  }
-  return ret;
-}
-
-void protolenlisttostr(String *protolenstr, List *wargslenList) {
-  int l = Len(wargslenList);
-  int i = 0;
-  if ((protolenstr == NULL) || (wargslenList == NULL)) {
-    return;
-  }
-  while (i < l) {
-    String *s = (String *) Getitem(wargslenList, i);
-    Append(protolenstr, "int ");
-    Append(protolenstr, s);
-    i++;
-    if (i < l) {
-      Append(protolenstr, ", ");
-    }
-  }
-}
-
-void argslenlisttostr(String *protolenstr, List *wargslenList) {
-  int l = Len(wargslenList);
-  int i = 0;
-  if ((protolenstr == NULL) || (wargslenList == NULL)) {
-    return;
-  }
-  while (i < l) {
-    String *s = (String *) Getitem(wargslenList, i);
-    Append(protolenstr, s);
-    i++;
-    if (i < l) {
-      Append(protolenstr, ", ");
-    }
-  }
-}
-
 int FORTRAN::functionWrapper(Node *n) {
   Printf(stdout, "creating function wrapper\n");
-  String *name = Getattr(n, "sym:name");
+  String *symname = Getattr(n, "sym:name");
   String *type = Getattr(n, "type");
-  ParmList *parms = Getattr(n, "parms");
 
   Wrapper *f = NewWrapper();
   Wrapper *fproxy = NewWrapper();
 
+  ParmList *parms = Getattr(n, "parms");
+
   // create new wrapper name
-  String *wname = Swig_name_wrapper(name);
+  String *wname = Swig_name_wrapper(symname);
   Setattr(n, "wrap:name", wname);
 
   // create the function definition
   String *return_type = SwigType_str(type, 0);
-  String *wproto = NewString("");
-//    String *wargs = NewString("");
-//    String *protoLen = NewString("");
-//    String *protoLens = NewString("");
-  ParmList *wparms = CopyParmList(parms);
-  Parm *p = wparms;
-//    List *wprotoList = NewList();
-  List *wargslenList = NewList();
 
-  while (p) {
-    String *ptype = Getattr(p, "type");
-    String *ptypeResolved = SwigType_typedef_resolve_all(ptype);
-    if (Strcmp(SwigType_str(ptypeResolved, 0), "char *") == 0) {
-      // if argument resolves to a character array,
-      // we need an additional parameter to describe
-      // the size of the array
-      String *npName = NewString("");
-      Printv(npName, Getattr(p, "name"), "_len", NIL);
-      Insert(wargslenList, DOH_END, npName);
-      Delete(npName);
-    } else if ((Strcmp(SwigType_str(ptypeResolved, 0), "int") == 0) ||
-               (Strcmp(SwigType_str(ptypeResolved, 0), "short") == 0) ||
-               (Strcmp(SwigType_str(ptypeResolved, 0), "float") == 0) ||
-               (Strcmp(SwigType_str(ptypeResolved, 0), "double") == 0) ||
-               (Strcmp(SwigType_str(ptypeResolved, 0), "long") == 0)) {
-      // fortran sends the address of integers
-      SwigType_add_pointer(ptype);
-      Setattr(p, "type", ptype);
-    }
-    String *pstr = SwigType_str(ptype, Getattr(p, "name"));
-    Append(wproto, pstr);
-    p = nextSibling(p);
-    if (p) {
-      Append(wproto, ", ");
-    }
-    Delete(pstr);
-    Delete(ptype);
-    Delete(ptypeResolved);
-  }
-  if (Len(wargslenList) > 0) {
-    String *s = NewString("");
-    protolenlisttostr(s, wargslenList);
-    Append(wproto, ", ");
-    Append(wproto, s);
-    Delete(s);
-  }
-  // argslenlisttostr(argslenstr, wargslenList);
+  /* Attach standard typemaps */
+  emit_attach_parmmaps(parms, f);
+  Setattr(n, "wrap:parms", parms);
 
-  Printv(f->def, return_type, " ", wname, "(", wproto, ") {\n", NIL);
+  /* Generate prototype and parameter strings
+     with extra parameters attached. extra parameters
+     are not sent through the typemap system. */
+  String *parmStr = emit_parm_str(parms);
+  String *argsStr = emit_args_str(parms);
+
+  Printv(f->def, return_type, " ", wname, "(", parmStr, ") {\n", NIL);
 
   // create alternative call functions (proxyfxns)
   // create proxy function with single underscore
-  // p = getFirstParm(lastParm);
-  Printv(fproxy->def, return_type, " ", name, "_", "(", wproto, ") {\n", NIL);
+  Printv(fproxy->def, return_type, " ", symname, "_", "(", parmStr, ") {\n", NIL);
+
   bool is_void_return = (SwigType_type(type) == T_VOID);
   if (!is_void_return) {
     Printf(fproxy->code, "return ");
   }
-  // String *wrapFxnCall = Swig_cfunction_call(wname, wparms);
-  // Printv(fproxy->code, wrapFxnCall, ";\n}", NIL);
-  String *wargs = parmListAsString(wparms);
-  if (Len(wargslenList) > 0) {
-    String *s = NewString("");
-    argslenlisttostr(s, wargslenList);
-    Append(wargs, ", ");
-    Append(wargs, s);
-    Delete(s);
-  }
-  Printv(fproxy->code, wname, "(", wargs, ")", ";\n}", NIL);
-  Delete(wargs);
+
+  Printv(fproxy->code, wname, "(", argsStr, ")", ";\n}", NIL);
   Wrapper_print(fproxy, f_proxyfxns);
 
   // create proxy function with double underscore
@@ -267,112 +167,36 @@ int FORTRAN::functionWrapper(Node *n) {
   // Emit all of the local variables for holding arguments.
   emit_parameter_variables(parms, f);
 
+
   // Emit variable holding return value.
   emit_return_variable(n, return_type, f);
 
-
-  /* Attach standard typemaps */
-  emit_attach_parmmaps(parms, f);
-  Setattr(n, "wrap:parms", parms);
-
-  /* Get number of require and total arguments */
-  int num_arguments = emit_num_arguments(parms);
-
-  /* Unmarshal parameters */
-  String *source;
-  String *source_len;
   String *tm;
-  String *incode = NewString("");
-  // ParmList *p2 = NULL;
-  Parm *p2;
-  int i = 0;
+  Parm *p;
 
   /* Insert input typemap code */
-  for (i = 0, p2 = parms; i < num_arguments; i++) {
-    /* Skip ignored arguments */
-
-    while (checkAttribute(p2, "tmap:in:numinputs", "0")) {
-      p2 = Getattr(p2, "tmap:in:next");
-    }
-
-    SwigType *pt = Getattr(p2, "type");
-    String *ln = Getattr(p2, "lname");
-
-
-    if ((tm = Getattr(p2, "tmap:in"))) {
-      String *parse = Getattr(p2, "tmap:in:parse");
-      if (!parse) {
-        /* Produce string representations of the source and target arguments */
-        source = Getattr(p2, "name");
-        source_len = NewString("");
-        Printv(source_len, Getattr(p2, "name"), "_len", NIL);
-
-        Replaceall(tm, "$target", ln);
-        Replaceall(tm, "$source", source);
-        Replaceall(tm, "$input", source);
-        Replaceall(tm, "$length", source_len);
-        Setattr(p2, "emit:input", source);
-
-        Printf(incode, "%s\n", tm);
-        Delete(source_len);
-      } else {
-        printf("tmap:in:parse was null\n");
-      }
-      p2 = Getattr(p2, "tmap:in:next");
-      continue;
+  String *inarg = NewString("");
+  p = parms;
+  while (p) {
+    if ((tm = Getattr(p, "tmap:in"))) {
+      Replaceall(tm, "$1", Getattr(p, "lname"));
+      Replaceall(tm, "$input", Getattr(p, "name"));
+      Printv(inarg, tm, "\n", NIL);
+      p = Getattr(p, "tmap:in:next");
     } else {
-      Swig_warning(WARN_TYPEMAP_IN_UNDEF, input_file, line_number, "Unable to use type %s as a function argument.\n", SwigType_str(pt, 0));
+      p = nextSibling(p);
     }
-    p2 = nextSibling(p);
   }
-
-  // print input typemap conversions to wrapper.
-  Printv(f->code, incode, "\n", NIL);
-
-  /* Insert constraint checking code */
-/*
-    for (p = parms; p;) {
-      if ((tm = Getattr(p, "tmap:check"))) {
-        Replaceall(tm, "$target", Getattr(p, "lname"));
-        Printv(f->code, tm, "\n", NIL);
-        p = Getattr(p, "tmap:check:next");
-      } else {
-        p = nextSibling(p);
-      }
-    }
-*/
-
-  /* Insert cleanup code */
-/*
-    for (i = 0, p = parms; p; i++) {
-      if (!checkAttribute(p, "tmap:in:numinputs", "0")
-          && !Getattr(p, "tmap:in:parse") && (tm = Getattr(p, "tmap:freearg"))) {
-        if (Len(tm) != 0) {
-          Replaceall(tm, "$source", Getattr(p, "lname"));
-          Printv(cleanup, tm, "\n", NIL);
-        }
-        p = Getattr(p, "tmap:freearg:next");
-      } else {
-        p = nextSibling(p);
-      }
-    }
-*/
 
   /* Insert argument output code */
   String *outarg = NewString("");
-  for (i = 0, p = parms; p; i++) {
+  p = parms;
+  while (p) {
     if ((tm = Getattr(p, "tmap:argout"))) {
-
-      source = Getattr(p, "name");
-      source_len = NewString("");
-      Printv(source_len, Getattr(p, "name"), "_len", NIL);
-
-      Replaceall(tm, "$input", Getattr(p, "lname"));
-      Replaceall(tm, "$output", source);
-      Replaceall(tm, "$length", source_len);
+      Replaceall(tm, "$1", Getattr(p, "lname"));
+      Replaceall(tm, "$input", Getattr(p, "name"));
       Printv(outarg, tm, "\n", NIL);
       p = Getattr(p, "tmap:argout:next");
-      Delete(source_len);
     } else {
       p = nextSibling(p);
     }
@@ -380,41 +204,41 @@ int FORTRAN::functionWrapper(Node *n) {
 
   // attach local variables to parameters
 
-  // create function call
-  // get function definition arguments
-  String *empty_string = NewString("");
-  String *arg_names = Swig_cfunction_call(empty_string, parms);
-  if (arg_names) {
-    // remove parenthesis before and after argument list
-    Delitem(arg_names, 0);
-    Delitem(arg_names, DOH_END);
-  }
+  // print input typemap conversions to wrapper.
+  Printv(f->code, inarg, "\n", NIL);
+  Delete(inarg);
 
   if (!is_void_return) {
     Printf(f->code, "result = ");
   }
-  Printv(f->code, name, "(", arg_names, ");\n", NIL);
+
+  // create function call
+  // get function definition arguments
+  String *empty_string = NewString("");
+  String *arg_names = Swig_cfunction_call(empty_string, parms);
+  Printv(f->code, symname, arg_names, ";\n", NIL);
+  Delete(empty_string);
+  Delete(arg_names);
 
   // attach output arguments
   Printv(f->code, "\n", outarg, "\n", NIL);
+  Delete(outarg);
 
   if (!is_void_return) {
     Printf(f->code, "return result;\n");
   }
   Printf(f->code, "}");
-
   // write out the wrapper file
   Wrapper_print(f, f_wrappers);
 
-  Delete(name);
-//    Delete(type);
+#if 0
+  Delete(symname);
+  Delete(type);
   Delete(wname);
-  Delete(arg_names);
   Delete(return_type);
-//    Delete(proto);
-  Delete(empty_string);
-  Delete(incode);
-  Delete(outarg);
+  Delete(parmStr);
+  Delete(argsStr);
+#endif
 
   return SWIG_OK;
 }
@@ -428,5 +252,4 @@ extern "C" Language *swig_fortran(void) {
  * ----------------------------------------------------------------------------- */
 
 const char *FORTRAN::usage = (char *) "\
-C Options (available with -c)\n\
 \n";

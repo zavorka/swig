@@ -16,12 +16,19 @@
 
         integer gcd, a, b , g
 
+        character*5 str
+        character*20 ret
+
         a = 45
         b = 105
         g = 0
 
         g = gcd(a, b)
         write(*,*) "The gcd of ", a," and ", b, " is ", g
+
+        call sayhi(str, a, ret)
+        write(*,*) "The result of sayhi is ", ret
+
 
 !       Swig_exit(0)
       end program runme

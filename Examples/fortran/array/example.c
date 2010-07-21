@@ -5,8 +5,7 @@
 double Foo = 3.0;
 
 /* Compute the greatest common divisor of positive integers */
-int gcd(int x, int y) {
-  int g;
+int* incrArrayInt(int *x, int nmemb) {
   g = y;
   while (x > 0) {
     g = x;
@@ -14,4 +13,11 @@ int gcd(int x, int y) {
     y = g;
   }
   return g;
+}
+
+void sayhi(char *str, int y, char *ret) {
+    if (ret != NULL) {
+        sprintf(ret, "hello %s", str);
+    }
+    return;
 }

@@ -336,6 +336,8 @@ void SWIG_library_directory(const char *);
 int emit_num_arguments(ParmList *);
 int emit_num_required(ParmList *);
 int emit_isvarargs(ParmList *);
+String *emit_parm_str(ParmList *p);
+String *emit_args_str(ParmList *p);
 void emit_attach_parmmaps(ParmList *, Wrapper *f);
 void emit_mark_varargs(ParmList *l);
 String *emit_action(Node *n);

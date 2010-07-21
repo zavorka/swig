@@ -227,6 +227,25 @@ String *ParmList_protostr(ParmList *p) {
 }
 
 /* ---------------------------------------------------------------------
+ * ParmList_argsstr()
+ *
+ * Generate a arguments string.
+ * ---------------------------------------------------------------------- */
+
+String *ParmList_argsstr(ParmList *p) {
+  String *out = NewStringEmpty();
+  while (p) {
+    String *name = Getattr(p, "name");
+    Append(out, name);
+    p = nextSibling(p);
+    if (p) {
+      Append(out, ",");
+    }
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------------
  * ParmList_has_defaultargs()
  *
  * Returns 1 if the parameter list passed in is has one or more default

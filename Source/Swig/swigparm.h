@@ -9,7 +9,7 @@
  * swigparm.h
  *
  * Functions related to the handling of function/method parameters and
- * parameter lists.  
+ * parameter lists.
  * ----------------------------------------------------------------------------- */
 
 /* Individual parameters */
@@ -29,5 +29,6 @@ extern String    *ParmList_str(ParmList *);
 extern String    *ParmList_str_defaultargs(ParmList *);
 extern String    *ParmList_str_multibrackets(ParmList *);
 extern String    *ParmList_protostr(ParmList *);
+extern String    *ParmList_argsstr(ParmList *);
 
 

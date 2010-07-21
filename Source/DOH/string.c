@@ -1131,6 +1131,7 @@ DOHString *DohNewStringf(const DOH *fmt, ...) {
  * Strncmp()
  * Strstr()
  * Strchr()
+ * Strrchr()
  *
  * Some utility functions.
  * ----------------------------------------------------------------------------- */
@@ -1157,4 +1158,8 @@ char *DohStrstr(const DOHString_or_char *s1, const DOHString_or_char *s2) {
 
 char *DohStrchr(const DOHString_or_char *s1, int ch) {
   return strchr(Char(s1), ch);
+}
+
+char *DohStrrchr(const DOHString_or_char *s1, int ch) {
+  return strrchr(Char(s1), ch);
 }

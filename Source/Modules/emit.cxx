@@ -14,6 +14,7 @@
 char cvsroot_emit_cxx[] = "$Id$";
 
 #include "swigmod.h"
+#include <ctype.h>
 
 /* -----------------------------------------------------------------------------
  * emit_return_variable()
@@ -95,6 +96,186 @@ void emit_parameter_variables(ParmList *l, Wrapper *f) {
       p = nextSibling(p);
     }
   }
+}
+
+/* -----------------------------------------------------------------------------
+ * apply_extraparm_attribute()
+ *
+ * returns tmap:in:extraparm attribute with variable replacements.
+ * ----------------------------------------------------------------------------- */
+
+String *apply_extraparm_attribute(Parm *p) {
+
+  String *s = Getattr(p,"tmap:in:extraparm");
+  if (s != NULL) {
+    Replaceall(s,"$1",Getattr(p, "lname"));
+  }
+  return s;
+}
+
+/* -----------------------------------------------------------------------------
+ * apply_replaceparm_attribute()
+ *
+ * returns tmap:in:replaceparm attribute variable replacements.
+ * ----------------------------------------------------------------------------- */
+
+String *apply_replaceparm_attribute(Parm *p) {
+
+  String *s = Getattr(p,"tmap:in:replaceparm");
+  if (s != NULL) {
+    Replaceall(s,"$type",Getattr(p, "type"));
+    Replaceall(s,"$input",Getattr(p, "name"));
+  }
+  return s;
+}
+
+
+/* -----------------------------------------------------------------------------
+ * emit_parm_str()
+ *
+ * Returns a string of function parameter prototypes with extraparm attached.
+ * ----------------------------------------------------------------------------- */
+
+String *emit_parm_str(ParmList *p) {
+
+  String *s;
+  String *parmStr = NewStringEmpty();
+  String *extraParmStr = NewStringEmpty();
+  int pLen = 0;
+  int epLen = 0;
+
+  while (p) {
+    // check for extraparm attribute
+    s = apply_extraparm_attribute(p);
+
+    if (s != NULL) {
+      if (epLen > 0) {
+        Append(extraParmStr, ",");
+      }
+      Append(extraParmStr, s);
+      epLen++;
+    }
+
+    // check for replaceparm attribute
+    s = apply_replaceparm_attribute(p);
+    if (pLen > 0) {
+      Append(parmStr, ",");
+    }
+    String *o = NULL;
+    if (s == NULL) {
+      // if there was no parm replacement, use the original parm.
+      String *type = Getattr(p, "type");
+      o = SwigType_str(type ? type : NewStringEmpty(), Getattr(p, "name"));
+      s = o;
+    }
+    Append(parmStr, s);
+    if (o != NULL) {
+      Delete(o);
+    }
+    o = NULL;
+    pLen++;
+
+    p = nextSibling(p);
+  }
+
+  // add extra parameters at the end as necessary
+  if (epLen > 0) {
+    if (pLen > 0) {
+      Append(parmStr,",");
+    }
+    Append(parmStr,extraParmStr);
+  }
+
+  return parmStr;
+}
+
+/* -----------------------------------------------------------------------------
+ * parse_name_from_arg()
+ *
+ * given a string like "size_t s_len", return the variable name s_len.
+ * this function is used to parse strings from a typemaps with the
+ * extraparms="size_t $1_len" attribute
+ * ----------------------------------------------------------------------------- */
+
+char *parse_name_from_arg(String *arg) {
+  //FIXME: this is a bad way of parsing parameters from their types
+  // wish the text could be sent through the parser for correct parsing
+  char *s = NULL;
+
+  if (arg == NULL) {
+    return NULL;
+  }
+
+  s = Strrchr(arg,' ');
+  if (s != NULL) {
+    s++;
+    // lazy way of finding valid variable names
+    // valid variable names are a sequence of one or
+    // more letters, digits or underscore characters (_)
+    while (!isalnum(*s) && (*s != '_')) {
+      s++;
+    }
+  } else {
+    s = Char(arg);
+  }
+
+  return s;
+}
+
+/* -----------------------------------------------------------------------------
+ * emit_args_str()
+ *
+ * Returns a string of function arguments with extraparm attached.
+ * ----------------------------------------------------------------------------- */
+
+String *emit_args_str(ParmList *p) {
+
+  String *s;
+  String *parmStr = NewStringEmpty();
+  String *extraParmStr = NewStringEmpty();
+  int pLen = 0;
+  int epLen = 0;
+  char *name = NULL;
+
+  while (p) {
+    // check for extraparm attribute
+    s = apply_extraparm_attribute(p);
+    if (s != NULL) {
+      if (epLen > 0) {
+        Append(extraParmStr, ",");
+      }
+      name = parse_name_from_arg(s);
+      Append(extraParmStr, name);
+      epLen++;
+    }
+
+    // check for replaceparm attribute
+    s = apply_replaceparm_attribute(p);
+    if (pLen > 0) {
+      Append(parmStr, ",");
+    }
+    if (s != NULL) {
+      name = parse_name_from_arg(s);
+      Append(parmStr, name);
+    } else {
+      // if there was no parm replacement, use the original parm.
+      s = Getattr(p, "name");
+      Append(parmStr, s);
+    }
+    pLen++;
+
+    p = nextSibling(p);
+  }
+
+  // add extra parameters at the end as necessary
+  if (epLen > 0) {
+    if (pLen > 0) {
+      Append(parmStr,",");
+    }
+    Append(parmStr,extraParmStr);
+  }
+
+  return parmStr;
 }
 
 /* -----------------------------------------------------------------------------
