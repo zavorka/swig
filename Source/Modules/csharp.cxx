@@ -1640,10 +1640,10 @@ public:
               base = Next(base);
               continue;
             }
-            String *proxyclassname = SwigType_str(Getattr(n, "classtypeobj"), 0);
-            String *baseclassname = SwigType_str(Getattr(base.item, "name"), 0);
-            Swig_warning(WARN_CSHARP_MULTIPLE_INHERITANCE, input_file, line_number,
-                         "Warning for %s proxy: Base %s ignored. Multiple inheritance is not supported in C#.\n", proxyclassname, baseclassname);
+            String *proxyclassname = Getattr(n, "classtypeobj");
+            String *baseclassname = Getattr(base.item, "name");
+            Swig_warning(WARN_CSHARP_MULTIPLE_INHERITANCE, Getfile(n), Getline(n),
+                         "Warning for %s proxy: Base %s ignored. Multiple inheritance is not supported in Java.\n", SwigType_namestr(proxyclassname), SwigType_namestr(baseclassname));
             base = Next(base);
           }
         }
@@ -1661,9 +1661,9 @@ public:
       Delete(baseclass);
       baseclass = NULL;
       if (purebase_notderived)
-        Swig_error(input_file, line_number, "The csbase typemap for proxy %s must contain just one of the 'replace' or 'notderived' attributes.\n", typemap_lookup_type);
+        Swig_error(Getfile(n), Getline(n), "The csbase typemap for proxy %s must contain just one of the 'replace' or 'notderived' attributes.\n", typemap_lookup_type);
     } else if (Len(pure_baseclass) > 0 && Len(baseclass) > 0) {
-      Swig_warning(WARN_CSHARP_MULTIPLE_INHERITANCE, input_file, line_number,
+      Swig_warning(WARN_CSHARP_MULTIPLE_INHERITANCE, Getfile(n), Getline(n),
 		   "Warning for %s proxy: Base %s ignored. Multiple inheritance is not supported in C#. "
 		   "Perhaps you need one of the 'replace' or 'notderived' attributes in the csbase typemap?\n", typemap_lookup_type, pure_baseclass);
     }
@@ -1704,10 +1704,10 @@ public:
     }
     if (tm && *Char(tm)) {
       if (!destruct_methodname) {
-	Swig_error(input_file, line_number, "No methodname attribute defined in csdestruct%s typemap for %s\n", (derived ? "_derived" : ""), proxy_class_name);
+	Swig_error(Getfile(n), Getline(n), "No methodname attribute defined in csdestruct%s typemap for %s\n", (derived ? "_derived" : ""), proxy_class_name);
       }
       if (!destruct_methodmodifiers) {
-	Swig_error(input_file, line_number,
+	Swig_error(Getfile(n), Getline(n),
 		   "No methodmodifiers attribute defined in csdestruct%s typemap for %s.\n", (derived ? "_derived" : ""), proxy_class_name);
       }
     }
@@ -2292,17 +2292,24 @@ public:
 	String *ex_imcall = Copy(imcall);
 	Replaceall(ex_imcall, "$imfuncname", ex_intermediary_function_name);
 	Replaceall(imcall, "$imfuncname", intermediary_function_name);
-
 	String *excode = NewString("");
-	if (!Cmp(return_type, "void"))
-	  Printf(excode, "if (this.GetType() == typeof(%s)) %s; else %s", proxy_class_name, imcall, ex_imcall);
-	else
-	  Printf(excode, "((this.GetType() == typeof(%s)) ? %s : %s)", proxy_class_name, imcall, ex_imcall);
+	Node *directorNode = Getattr(n, "directorNode");
+	if (directorNode) {
+	  UpcallData *udata = Getattr(directorNode, "upcalldata");
+	  String *methid = Getattr(udata, "class_methodidx");
 
-	Clear(imcall);
-	Printv(imcall, excode, NIL);
-	Delete(ex_overloaded_name);
+	  if (!Cmp(return_type, "void"))
+	    Printf(excode, "if (SwigDerivedClassHasMethod(\"%s\", swigMethodTypes%s)) %s; else %s", proxy_function_name, methid, ex_imcall, imcall);
+	  else
+	    Printf(excode, "(SwigDerivedClassHasMethod(\"%s\", swigMethodTypes%s) ? %s : %s)", proxy_function_name, methid, ex_imcall, imcall);
+
+	  Clear(imcall);
+	  Printv(imcall, excode, NIL);
+	} else {
+	  // probably an ignored method or nodirector
+	}
 	Delete(excode);
+	Delete(ex_overloaded_name);
       } else {
 	Replaceall(imcall, "$imfuncname", intermediary_function_name);
       }
@@ -2343,6 +2350,7 @@ public:
 	SwigType *pt = Getattr(p, "type");
 	if ((tm = Getattr(p, "tmap:csvarin"))) {
 	  substituteClassname(pt, tm);
+	  Replaceall(tm, "$csinput", "value");
 	  Replaceall(tm, "$imcall", imcall);
 	  excodeSubstitute(n, tm, "csvarin", p);
 	  Printf(proxy_class_code, "%s", tm);
@@ -3472,7 +3480,6 @@ public:
     String *callback_def = NewString("");
     String *callback_code = NewString("");
     String *imcall_args = NewString("");
-    int gencomma = 0;
     bool ignored_method = GetFlag(n, "feature:ignore") ? true : false;
 
     // Kludge Alert: functionWrapper sets sym:overload properly, but it
@@ -3616,14 +3623,14 @@ public:
       Printf(w->code, "} else {\n");
 
     /* Go through argument list, convert from native to Java */
-    for (p = l; p; /* empty */ ) {
+    for (i = 0, p = l; p; ++i) {
       /* Is this superfluous? */
       while (checkAttribute(p, "tmap:directorin:numinputs", "0")) {
 	p = Getattr(p, "tmap:directorin:next");
       }
 
       SwigType *pt = Getattr(p, "type");
-      String *ln = Copy(Getattr(p, "name"));
+      String *ln = makeParameterName(n, p, i, false);
       String *c_param_type = NULL;
       String *c_decl = NewString("");
       String *arg = NewString("");
@@ -3631,7 +3638,7 @@ public:
       Printf(arg, "j%s", ln);
 
       /* And add to the upcall args */
-      if (gencomma > 0)
+      if (i > 0)
 	Printf(jupcall_args, ", ");
       Printf(jupcall_args, "%s", arg);
 
@@ -3641,17 +3648,13 @@ public:
 	if (ctypeout)
 	  c_param_type = ctypeout;
 
-	Parm *tp = NewParm(c_param_type, empty_str, n);
-	String *desc_tm = NULL;
-
 	/* Add to local variables */
 	Printf(c_decl, "%s %s", c_param_type, arg);
 	if (!ignored_method)
 	  Wrapper_add_localv(w, arg, c_decl, (!(SwigType_ispointer(pt) || SwigType_isreference(pt)) ? "" : "= 0"), NIL);
 
 	/* Add input marshalling code */
-	if ((desc_tm = Swig_typemap_lookup("directorin", tp, "", 0))
-	    && (tm = Getattr(p, "tmap:directorin"))) {
+	if ((tm = Getattr(p, "tmap:directorin"))) {
 
 	  Replaceall(tm, "$input", arg);
 	  Replaceall(tm, "$owner", "0");
@@ -3663,7 +3666,7 @@ public:
 	  Delete(tm);
 
 	  /* Add C type to callback typedef */
-	  if (gencomma > 0)
+	  if (i > 0)
 	    Printf(callback_typedef_parms, ", ");
 	  Printf(callback_typedef_parms, "%s", c_param_type);
 
@@ -3684,7 +3687,7 @@ public:
 	      substituteClassname(pt, din);
 	      Replaceall(din, "$iminput", ln);
 
-	      if (gencomma > 0) {
+	      if (i > 0) {
 		Printf(delegate_parms, ", ");
 		Printf(proxy_method_types, ", ");
 		Printf(imcall_args, ", ");
@@ -3716,24 +3719,13 @@ public:
 
 	  p = Getattr(p, "tmap:directorin:next");
 
-	  Delete(desc_tm);
 	} else {
-	  if (!desc_tm) {
-	    Swig_warning(WARN_CSHARP_TYPEMAP_CSDIRECTORIN_UNDEF, input_file, line_number,
-			 "No or improper directorin typemap defined for %s for use in %s::%s (skipping director method)\n", 
-			 SwigType_str(c_param_type, 0), SwigType_namestr(c_classname), SwigType_namestr(name));
-	    p = nextSibling(p);
-	  } else if (!tm) {
-	    Swig_warning(WARN_CSHARP_TYPEMAP_CSDIRECTORIN_UNDEF, input_file, line_number,
-			 "No or improper directorin typemap defined for argument %s for use in %s::%s (skipping director method)\n", 
-			 SwigType_str(pt, 0), SwigType_namestr(c_classname), SwigType_namestr(name));
-	    p = nextSibling(p);
-	  }
-
+	  Swig_warning(WARN_CSHARP_TYPEMAP_CSDIRECTORIN_UNDEF, input_file, line_number,
+		       "No or improper directorin typemap defined for argument %s for use in %s::%s (skipping director method)\n", 
+		       SwigType_str(pt, 0), SwigType_namestr(c_classname), SwigType_namestr(name));
+	  p = nextSibling(p);
 	  output_director = false;
 	}
-
-	Delete(tp);
       } else {
 	Swig_warning(WARN_CSHARP_TYPEMAP_CTYPE_UNDEF, input_file, line_number, "No ctype typemap defined for %s for use in %s::%s (skipping director method)\n", 
 	    SwigType_str(pt, 0), SwigType_namestr(c_classname), SwigType_namestr(name));
@@ -3741,7 +3733,7 @@ public:
 	p = nextSibling(p);
       }
 
-      gencomma++;
+      Delete(ln);
       Delete(arg);
       Delete(c_decl);
       Delete(c_param_type);
@@ -3884,6 +3876,10 @@ public:
       /* Emit the actual upcall through */
       UpcallData *udata = addUpcallMethod(imclass_dmethod, symname, decl, overloaded_name);
       String *methid = Getattr(udata, "class_methodidx");
+      Setattr(n, "upcalldata", udata);
+      /*
+      Printf(stdout, "setting upcalldata, nodeType: %s %s::%s %p\n", nodeType(n), classname, Getattr(n, "name"), n);
+      */
 
       Printf(director_callback_typedefs, "    typedef %s (SWIGSTDCALL* SWIG_Callback%s_t)(", c_ret_type, methid);
       Printf(director_callback_typedefs, "%s);\n", callback_typedef_parms);

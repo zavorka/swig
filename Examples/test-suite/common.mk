@@ -154,6 +154,7 @@ CPP_TEST_CASES += \
 	derived_nested \
 	destructor_reprotected \
 	director_abstract \
+	director_alternating \
 	director_basic \
 	director_classes \
 	director_classic \
@@ -166,6 +167,7 @@ CPP_TEST_CASES += \
 	director_finalizer \
 	director_frob \
 	director_ignore \
+	director_keywords \
 	director_namespace_clash \
 	director_nested \
 	director_overload \
@@ -228,9 +230,11 @@ CPP_TEST_CASES += \
 	li_cpointer \
 	li_stdint \
 	li_typemaps \
+	li_typemaps_apply \
 	li_windows \
 	long_long_apply \
 	memberin_extend \
+	member_funcptr_galore \
 	member_pointer \
 	member_template \
 	minherit \
@@ -283,7 +287,10 @@ CPP_TEST_CASES += \
 	rename3 \
 	rename4 \
 	rename_scope \
+	rename_simple \
 	rename_strip_encoder \
+	rename_pcre_encoder \
+	rename_pcre_enum \
 	restrict_cplusplus \
 	return_const_value \
 	return_value_scope \
@@ -292,6 +299,7 @@ CPP_TEST_CASES += \
 	sizet \
 	smart_pointer_const \
 	smart_pointer_const2 \
+	smart_pointer_const_overload \
 	smart_pointer_extend \
 	smart_pointer_member \
 	smart_pointer_multi \
@@ -315,11 +323,11 @@ CPP_TEST_CASES += \
 	struct_initialization_cpp \
 	struct_value \
 	symbol_clash \
-	template \
 	template_arg_replace \
 	template_arg_scope \
 	template_arg_typename \
 	template_array_numeric \
+	template_basic \
 	template_base_template \
 	template_classes \
 	template_const_ref \
@@ -393,6 +401,7 @@ CPP_TEST_CASES += \
 	typedef_scope \
 	typedef_sizet \
 	typedef_struct \
+	typemap_arrays \
 	typemap_delete \
 	typemap_global_scope \
 	typemap_namespace \
@@ -463,7 +472,7 @@ C_TEST_CASES += \
 	extern_declaration \
 	funcptr \
 	function_typedef \
-	immutable \
+	immutable_values \
 	inctest \
 	integers \
         keyword_rename \
@@ -484,6 +493,9 @@ C_TEST_CASES += \
 	overload_extendc \
 	preproc \
 	preproc_constants_c \
+	preproc_defined \
+	preproc_include \
+	preproc_line_file \
 	ret_by_value \
 	simple_array \
 	sizeof_pointer \
@@ -507,6 +519,7 @@ MULTI_CPP_TEST_CASES += \
 
 # Custom tests - tests with additional commandline options
 wallkw.cpptest: SWIGOPT += -Wallkw
+preproc_include.ctest: SWIGOPT += -includeall
 
 
 NOT_BROKEN_TEST_CASES =	$(CPP_TEST_CASES:=.cpptest) \

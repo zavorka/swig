@@ -216,7 +216,7 @@ class Allocate:public Dispatcher {
 
 	      if (!most_base_covariant_type) {
 		// Eliminate the derived virtual method.
-		if (virtual_elimination_mode)
+		if (virtual_elimination_mode && !is_member_director(n))
 		  if (both_have_public_access)
 		    if (!is_non_public_base(inclass, b))
 		      if (!Swig_symbol_isoverloaded(n)) {
@@ -824,8 +824,11 @@ Allocate():
 		  int isconst = 0;
 		  Delete(SwigType_pop(type));
 		  if (SwigType_isconst(type)) {
-		    isconst = 1;
+		    isconst = !Getattr(inclass, "allocate:smartpointermutable");
 		    Setattr(inclass, "allocate:smartpointerconst", "1");
+		  }
+		  else {
+		    Setattr(inclass, "allocate:smartpointermutable", "1");
 		  }
 		  List *methods = smart_pointer_methods(sc, 0, isconst);
 		  Setattr(inclass, "allocate:smartpointer", methods);
@@ -834,7 +837,6 @@ Allocate():
 		  /* Hmmm.  The return value is not a pointer.  If the type is a value
 		     or reference.  We're going to chase it to see if another operator->()
 		     can be found */
-
 		  if ((SwigType_check_decl(type, "")) || (SwigType_check_decl(type, "r."))) {
 		    Node *nn = Swig_symbol_clookup((char *) "operator ->", Getattr(sc, "symtab"));
 		    if (nn) {

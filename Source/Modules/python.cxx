@@ -130,7 +130,7 @@ static const char *usage2 = (char *) "\
      -nofastproxy    - Use traditional proxy mechanism for member methods (default) \n\
      -nofastquery    - Use traditional query mechanism for types (default) \n\
      -noh            - Don't generate the output header file\n\
-     -nomodern       - Don't use modern python features which are not back compatible \n\
+     -nomodern       - Don't use modern python features which are not backwards compatible \n\
      -nomodernargs   - Use classic ParseTuple/CallFunction methods to pack/unpack the function arguments (default) \n";
 static const char *usage3 = (char *) "\
      -noolddefs      - Don't emit the old method definitions even when using fastproxy (default) \n\
@@ -1799,7 +1799,7 @@ public:
       } while ((sibl = Getattr(sibl, "sym:nextSibling")));
       Append(f->code, "fail:\n");
       Printf(f->code, "SWIG_SetErrorMsg(PyExc_NotImplementedError,"
-	     "\"Wrong number of arguments for overloaded function '%s'.\\n\"" "\n\"  Possible C/C++ prototypes are:\\n\"%s);\n", symname, protoTypes);
+	     "\"Wrong number or type of arguments for overloaded function '%s'.\\n\"" "\n\"  Possible C/C++ prototypes are:\\n\"%s);\n", symname, protoTypes);
       Append(f->code, "return NULL;\n");
       Delete(protoTypes);
     }
@@ -2866,7 +2866,7 @@ public:
           bool ignore = GetFlag(b.item, "feature:ignore") ? true : false;
 	  if (!bname || ignore) {
             if (!bname && !ignore) {
-              Swig_warning(WARN_TYPE_UNDEFINED_CLASS, input_file, line_number,
+              Swig_warning(WARN_TYPE_UNDEFINED_CLASS, Getfile(n), Getline(n),
                   "Base class '%s' ignored - unknown module name for base. Either import the appropriate module interface file or specify the name of the module in the %%import directive.\n", SwigType_namestr(Getattr(b.item, "name")));
             }
 	    b = Next(b);

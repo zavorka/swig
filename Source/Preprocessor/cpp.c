@@ -33,6 +33,10 @@ static Hash *included_files = 0;
 static List *dependencies = 0;
 static Scanner *id_scan = 0;
 static int error_as_warning = 0;	/* Understand the cpp #error directive as a special #warning */
+static int expand_defined_operator = 0;
+static int macro_level = 0;
+static int macro_start_line = 0;
+static const String * macro_start_file = 0;
 
 /* Test a character to see if it starts an identifier */
 #define isidentifier(c) ((isalpha(c)) || (c == '_') || (c == '$'))
@@ -40,7 +44,7 @@ static int error_as_warning = 0;	/* Understand the cpp #error directive as a spe
 /* Test a character to see if it valid in an identifier (after the first letter) */
 #define isidchar(c) ((isalnum(c)) || (c == '_') || (c == '$'))
 
-DOH *Preprocessor_replace(DOH *);
+static DOH *Preprocessor_replace(DOH *);
 
 /* Skip whitespace */
 static void skip_whitespace(String *s, String *out) {
@@ -148,6 +152,9 @@ static String *kpp_dextern = 0;
 static String *kpp_LINE = 0;
 static String *kpp_FILE = 0;
 
+static String *kpp_hash_if = 0;
+static String *kpp_hash_elif = 0;
+
 void Preprocessor_init(void) {
   Hash *s;
 
@@ -183,6 +190,9 @@ void Preprocessor_init(void) {
 
   kpp_LINE = NewString("__LINE__");
   kpp_FILE = NewString("__FILE__");
+
+  kpp_hash_if = NewString("#if");
+  kpp_hash_elif = NewString("#elif");
 
   cpp = NewHash();
   s = NewHash();
@@ -225,9 +235,12 @@ void Preprocessor_delete(void) {
   Delete(kpp_ddefine);
   Delete(kpp_dline);
 
-
   Delete(kpp_LINE);
   Delete(kpp_FILE);
+
+  Delete(kpp_hash_if);
+  Delete(kpp_hash_elif);
+
   Delete(cpp);
   Delete(included_files);
   Preprocessor_expr_delete();
@@ -322,6 +335,7 @@ Hash *Preprocessor_define(const_String_or_char_ptr _str, int swigmacro) {
 
   /* Now look for a macro name */
   macroname = NewStringEmpty();
+  copy_location(str, macroname);
   while ((c = Getc(str)) != EOF) {
     if (c == '(') {
       argstr = NewStringEmpty();
@@ -334,7 +348,7 @@ Hash *Preprocessor_define(const_String_or_char_ptr _str, int swigmacro) {
 	  Putc(c, argstr);
       }
       if (c != ')') {
-	Swig_error(Getfile(str), Getline(str), "Missing \')\' in macro parameters\n");
+	Swig_error(Getfile(argstr), Getline(argstr), "Missing \')\' in macro parameters\n");
 	goto macro_error;
       }
       break;
@@ -350,8 +364,6 @@ Hash *Preprocessor_define(const_String_or_char_ptr _str, int swigmacro) {
 	break;
       }
     } else {
-      /*Swig_error(Getfile(str),Getline(str),"Illegal character in macro name\n");
-         goto macro_error; */
       Ungetc(c, str);
       break;
     }
@@ -359,6 +371,7 @@ Hash *Preprocessor_define(const_String_or_char_ptr _str, int swigmacro) {
   if (!swigmacro)
     skip_whitespace(str, 0);
   macrovalue = NewStringEmpty();
+  copy_location(str, macrovalue);
   while ((c = Getc(str)) != EOF) {
     Putc(c, macrovalue);
   }
@@ -371,10 +384,10 @@ Hash *Preprocessor_define(const_String_or_char_ptr _str, int swigmacro) {
     argname = NewStringEmpty();
     while ((c = Getc(argstr)) != EOF) {
       if (c == ',') {
-	varargname = Macro_vararg_name(argname, str);
+	varargname = Macro_vararg_name(argname, argstr);
 	if (varargname) {
 	  Delete(varargname);
-	  Swig_error(Getfile(str), Getline(str), "Variable-length macro argument must be last parameter\n");
+	  Swig_error(Getfile(argstr), Getline(argstr), "Variable length macro argument must be last parameter\n");
 	} else {
 	  Append(arglist, argname);
 	}
@@ -384,13 +397,13 @@ Hash *Preprocessor_define(const_String_or_char_ptr _str, int swigmacro) {
 	Putc(c, argname);
       } else if (!(isspace(c) || (c == '\\'))) {
 	Delete(argname);
-	Swig_error(Getfile(str), Getline(str), "Illegal character in macro argument name\n");
+	Swig_error(Getfile(argstr), Getline(argstr), "Illegal character in macro argument name\n");
 	goto macro_error;
       }
     }
     if (Len(argname)) {
       /* Check for varargs */
-      varargname = Macro_vararg_name(argname, str);
+      varargname = Macro_vararg_name(argname, argstr);
       if (varargname) {
 	Append(arglist, varargname);
 	Delete(varargname);
@@ -508,7 +521,7 @@ Hash *Preprocessor_define(const_String_or_char_ptr _str, int swigmacro) {
   symbols = Getattr(cpp, kpp_symbols);
   if ((m1 = Getattr(symbols, macroname))) {
     if (!Checkattr(m1, kpp_value, macrovalue)) {
-      Swig_error(Getfile(str), Getline(str), "Macro '%s' redefined,\n", macroname);
+      Swig_error(Getfile(macroname), Getline(macroname), "Macro '%s' redefined,\n", macroname);
       Swig_error(Getfile(m1), Getline(m1), "previous definition of '%s'.\n", macroname);
       goto macro_error;
     }
@@ -551,7 +564,7 @@ void Preprocessor_undef(const_String_or_char_ptr str) {
  * Isolates macro arguments and returns them in a list.   For each argument,
  * leading and trailing whitespace is stripped (ala K&R, pg. 230).
  * ----------------------------------------------------------------------------- */
-static List *find_args(String *s) {
+static List *find_args(String *s, int ismacro, String *macro_name) {
   List *args;
   String *str;
   int c, level;
@@ -622,12 +635,15 @@ static List *find_args(String *s) {
     c = Getc(s);
   }
 unterm:
-  Swig_error(Getfile(args), Getline(args), "Unterminated macro call.\n");
+  if (ismacro)
+    Swig_error(Getfile(args), Getline(args), "Unterminated call invoking macro '%s'\n", macro_name);
+  else
+    Swig_error(Getfile(args), Getline(args), "Unterminated call to '%s'\n", macro_name);
   return args;
 }
 
 /* -----------------------------------------------------------------------------
- * DOH *get_filename(DOH *str)
+ * DOH *get_filename()
  *
  * Read a filename from str.   A filename can be enclosed in quotes, angle brackets,
  * or bare.
@@ -637,7 +653,6 @@ static String *get_filename(String *str, int *sysfile) {
   String *fn;
   int c;
 
-  skip_whitespace(str, 0);
   fn = NewStringEmpty();
   copy_location(str, fn);
   c = Getc(str);
@@ -663,9 +678,7 @@ static String *get_filename(String *str, int *sysfile) {
 }
 
 static String *get_options(String *str) {
-
   int c;
-  skip_whitespace(str, 0);
   c = Getc(str);
   if (c == '(') {
     String *opt;
@@ -694,9 +707,12 @@ static String *get_options(String *str) {
  *
  * Perform macro expansion and return a new string.  Returns NULL if some sort
  * of error occurred.
+ * name - name of the macro
+ * args - arguments passed to the macro
+ * line_file - only used for line/file name when reporting errors
  * ----------------------------------------------------------------------------- */
 
-static String *expand_macro(String *name, List *args) {
+static String *expand_macro(String *name, List *args, String *line_file) {
   String *ns;
   DOH *symbols, *macro, *margs, *mvalue, *temp, *tempa, *e;
   int i, l;
@@ -710,6 +726,14 @@ static String *expand_macro(String *name, List *args) {
   macro = Getattr(symbols, name);
   if (!macro)
     return 0;
+
+  if (macro_level == 0) {
+    /* Store the start of the macro should the macro contain __LINE__ and __FILE__ for expansion */
+    macro_start_line = Getline(args ? args : line_file);
+    macro_start_file = Getfile(args ? args : line_file);
+  }
+  macro_level++;
+
   if (Getattr(macro, kpp_expanded)) {
     ns = NewStringEmpty();
     Append(ns, name);
@@ -725,6 +749,7 @@ static String *expand_macro(String *name, List *args) {
       if (i)
 	Putc(')', ns);
     }
+    macro_level--;
     return ns;
   }
 
@@ -759,16 +784,18 @@ static String *expand_macro(String *name, List *args) {
   /* If there are arguments, see if they match what we were given */
   if (args && (margs) && (Len(margs) != Len(args))) {
     if (Len(margs) > (1 + isvarargs))
-      Swig_error(Getfile(args), Getline(args), "Macro '%s' expects %d arguments\n", name, Len(margs) - isvarargs);
+      Swig_error(macro_start_file, macro_start_line, "Macro '%s' expects %d arguments\n", name, Len(margs) - isvarargs);
     else if (Len(margs) == (1 + isvarargs))
-      Swig_error(Getfile(args), Getline(args), "Macro '%s' expects 1 argument\n", name);
+      Swig_error(macro_start_file, macro_start_line, "Macro '%s' expects 1 argument\n", name);
     else
-      Swig_error(Getfile(args), Getline(args), "Macro '%s' expects no arguments\n", name);
+      Swig_error(macro_start_file, macro_start_line, "Macro '%s' expects no arguments\n", name);
+    macro_level--;
     return 0;
   }
 
   /* If the macro expects arguments, but none were supplied, we leave it in place */
   if (!args && (margs) && Len(margs) > 0) {
+    macro_level--;
     return NewString(name);
   }
 
@@ -922,25 +949,10 @@ static String *expand_macro(String *name, List *args) {
     Delete(e);
     e = f;
   }
+  macro_level--;
   Delete(temp);
   Delete(tempa);
   return e;
-}
-
-/* -----------------------------------------------------------------------------
- * evaluate_args()
- *
- * Evaluate the arguments of a macro 
- * ----------------------------------------------------------------------------- */
-
-List *evaluate_args(List *x) {
-  Iterator i;
-  List *nl = NewList();
-
-  for (i = First(x); i.item; i = Next(i)) {
-    Append(nl, Preprocessor_replace(i.item));
-  }
-  return nl;
 }
 
 /* -----------------------------------------------------------------------------
@@ -954,10 +966,9 @@ List *evaluate_args(List *x) {
 
 /* #define SWIG_PUT_BUFF  */
 
-DOH *Preprocessor_replace(DOH *s) {
+static DOH *Preprocessor_replace(DOH *s) {
   DOH *ns, *symbols, *m;
   int c, i, state = 0;
-
   String *id = NewStringEmpty();
 
   assert(cpp);
@@ -971,10 +982,18 @@ DOH *Preprocessor_replace(DOH *s) {
   while ((c = Getc(s)) != EOF) {
     switch (state) {
     case 0:
-      if (isidentifier(c) || (c == '%')) {
+      if (isidentifier(c)) {
 	Clear(id);
 	Putc(c, id);
-	state = 1;
+	state = 4;
+      } else if (c == '%') {
+	Clear(id);
+	Putc(c, id);
+	state = 2;
+      } else if (c == '#') {
+	Clear(id);
+	Putc(c, id);
+	state = 4;
       } else if (c == '\"') {
 	Putc(c, ns);
 	skip_tochar(s, '\"', ns);
@@ -984,86 +1003,115 @@ DOH *Preprocessor_replace(DOH *s) {
       } else if (c == '/') {
 	Putc(c, ns);
 	state = 10;
+      } else if (c == '\\') {
+	Putc(c, ns);
+	c = Getc(s);
+	if (c == '\n') {
+	  Putc(c, ns);
+	} else {
+	  Ungetc(c, s);
+	}
+      } else if (c == '\n') {
+	Putc(c, ns);
+	expand_defined_operator = 0;
       } else {
 	Putc(c, ns);
       }
       break;
-    case 1:			/* An identifier */
+    case 2:
+      /* Found '%#' */
+      if (c == '#') {
+	Putc(c, id);
+	state = 4;
+      } else {
+	Ungetc(c, s);
+	state = 4;
+      }
+      break;
+    case 4:			/* An identifier */
       if (isidchar(c)) {
 	Putc(c, id);
-	state = 1;
+	state = 4;
       } else {
 	/* We found the end of a valid identifier */
 	Ungetc(c, s);
-	/* See if this is the special "defined" macro */
-	if (Equal(kpp_defined, id)) {
-	  int lenargs = 0;
-	  DOH *args = 0;
-	  /* See whether or not a paranthesis has been used */
-	  skip_whitespace(s, 0);
-	  c = Getc(s);
-	  if (c == '(') {
-	    Ungetc(c, s);
-	    args = find_args(s);
-	  } else if (isidchar(c)) {
-	    DOH *arg = NewStringEmpty();
-	    args = NewList();
-	    Putc(c, arg);
-	    while (((c = Getc(s)) != EOF)) {
-	      if (!isidchar(c)) {
-		Ungetc(c, s);
-		break;
-	      }
+	/* See if this is the special "defined" operator */
+       	if (Equal(kpp_defined, id)) {
+	  if (expand_defined_operator) {
+	    int lenargs = 0;
+	    DOH *args = 0;
+	    /* See whether or not a parenthesis has been used */
+	    skip_whitespace(s, 0);
+	    c = Getc(s);
+	    if (c == '(') {
+	      Ungetc(c, s);
+	      args = find_args(s, 0, kpp_defined);
+	    } else if (isidchar(c)) {
+	      DOH *arg = NewStringEmpty();
+	      args = NewList();
 	      Putc(c, arg);
+	      while (((c = Getc(s)) != EOF)) {
+		if (!isidchar(c)) {
+		  Ungetc(c, s);
+		  break;
+		}
+		Putc(c, arg);
+	      }
+	      if (Len(arg))
+		Append(args, arg);
+	      Delete(arg);
+	    } else {
+	      Seek(s, -1, SEEK_CUR);
 	    }
-	    if (Len(arg))
-	      Append(args, arg);
-	    Delete(arg);
-	  } else {
-	    Seek(s, -1, SEEK_CUR);
-	  }
-	  lenargs = Len(args);
-	  if ((!args) || (!lenargs)) {
-	    /* This is not a defined() macro. */
-	    Append(ns, id);
-	    state = 0;
-	    break;
-	  }
-	  for (i = 0; i < lenargs; i++) {
-	    DOH *o = Getitem(args, i);
-	    if (!Getattr(symbols, o)) {
+	    lenargs = Len(args);
+	    if ((!args) || (!lenargs)) {
+	      /* This is not a defined() operator. */
+	      Append(ns, id);
+	      state = 0;
 	      break;
 	    }
+	    for (i = 0; i < lenargs; i++) {
+	      DOH *o = Getitem(args, i);
+	      if (!Getattr(symbols, o)) {
+		break;
+	      }
+	    }
+	    if (i < lenargs)
+	      Putc('0', ns);
+	    else
+	      Putc('1', ns);
+	    Delete(args);
+	  } else {
+	    Append(ns, id);
 	  }
-	  if (i < lenargs)
-	    Putc('0', ns);
-	  else
-	    Putc('1', ns);
-	  Delete(args);
 	  state = 0;
 	  break;
-	}
-	if (Equal(kpp_LINE, id)) {
-	  Printf(ns, "%d", Getline(s));
+	} else if (Equal(kpp_LINE, id)) {
+	  Printf(ns, "%d", macro_level > 0 ? macro_start_line : Getline(s));
 	  state = 0;
 	  break;
-	}
-	if (Equal(kpp_FILE, id)) {
-	  String *fn = Copy(Getfile(s));
+	} else if (Equal(kpp_FILE, id)) {
+	  String *fn = Copy(macro_level > 0 ? macro_start_file : Getfile(s));
 	  Replaceall(fn, "\\", "\\\\");
 	  Printf(ns, "\"%s\"", fn);
 	  Delete(fn);
 	  state = 0;
 	  break;
-	}
-	/* See if the macro is defined in the preprocessor symbol table */
-	if ((m = Getattr(symbols, id))) {
+	} else if (Equal(kpp_hash_if, id) || Equal(kpp_hash_elif, id)) {
+	  expand_defined_operator = 1;
+	  Append(ns, id);
+	} else if ((m = Getattr(symbols, id))) {
+	  /* See if the macro is defined in the preprocessor symbol table */
 	  DOH *args = 0;
 	  DOH *e;
+	  int macro_additional_lines = 0;
 	  /* See if the macro expects arguments */
 	  if (Getattr(m, kpp_args)) {
 	    /* Yep.  We need to go find the arguments and do a substitution */
-	    args = find_args(s);
+	    int line = Getline(s);
+	    args = find_args(s, 1, id);
+	    macro_additional_lines = Getline(s) - line;
+	    assert(macro_additional_lines >= 0);
 	    if (!Len(args)) {
 	      Delete(args);
 	      args = 0;
@@ -1071,9 +1119,12 @@ DOH *Preprocessor_replace(DOH *s) {
 	  } else {
 	    args = 0;
 	  }
-	  e = expand_macro(id, args);
+	  e = expand_macro(id, args, s);
 	  if (e) {
 	    Append(ns, e);
+	  }
+	  while (macro_additional_lines--) {
+	    Putc('\n', ns);
 	  }
 	  Delete(e);
 	  Delete(args);
@@ -1096,11 +1147,15 @@ DOH *Preprocessor_replace(DOH *s) {
       Putc(c, ns);
       break;
     case 11:
+      /* in C++ comment */
       Putc(c, ns);
-      if (c == '\n')
+      if (c == '\n') {
+	expand_defined_operator = 0;
 	state = 0;
+      }
       break;
     case 12:
+      /* in C comment */
       Putc(c, ns);
       if (c == '*')
 	state = 13;
@@ -1119,10 +1174,17 @@ DOH *Preprocessor_replace(DOH *s) {
   }
 
   /* Identifier at the end */
-  if (state == 1) {
-    /* See if this is the special "defined" macro */
+  if (state == 2 || state == 4) {
+    /* See if this is the special "defined" operator */
     if (Equal(kpp_defined, id)) {
       Swig_error(Getfile(s), Getline(s), "No arguments given to defined()\n");
+    } else if (Equal(kpp_LINE, id)) {
+      Printf(ns, "%d", macro_level > 0 ? macro_start_line : Getline(s));
+    } else if (Equal(kpp_FILE, id)) {
+      String *fn = Copy(macro_level > 0 ? macro_start_file : Getfile(s));
+      Replaceall(fn, "\\", "\\\\");
+      Printf(ns, "\"%s\"", fn);
+      Delete(fn);
     } else if ((m = Getattr(symbols, id))) {
       DOH *e;
       /* Yes.  There is a macro here */
@@ -1130,8 +1192,9 @@ DOH *Preprocessor_replace(DOH *s) {
       /*      if (Getattr(m,"args")) {
          Swig_error(Getfile(id),Getline(id),"Macro arguments expected.\n");
          } */
-      e = expand_macro(id, 0);
-      Append(ns, e);
+      e = expand_macro(id, 0, s);
+      if (e)
+	Append(ns, e);
       Delete(e);
     } else {
       Append(ns, id);
@@ -1264,8 +1327,8 @@ String *Preprocessor_parse(String *s) {
     case 0:			/* Initial state - in first column */
       /* Look for C preprocessor directives.   Otherwise, go directly to state 1 */
       if (c == '#') {
-	add_chunk(ns, chunk, allow);
 	copy_location(s, chunk);
+	add_chunk(ns, chunk, allow);
 	cpp_lines = 1;
 	state = 40;
       } else if (isspace(c)) {
@@ -1414,7 +1477,6 @@ String *Preprocessor_parse(String *s) {
       else if (c == '\n') {
 	Putc('/', value);
 	Ungetc(c, s);
-	cpp_lines++;
 	state = 50;
       } else {
 	Putc('/', value);
@@ -1422,15 +1484,14 @@ String *Preprocessor_parse(String *s) {
 	state = 43;
       }
       break;
-    case 46:
+    case 46: /* in C++ comment */
       if (c == '\n') {
 	Ungetc(c, s);
-	cpp_lines++;
 	state = 50;
       } else
 	Putc(c, comment);
       break;
-    case 47:
+    case 47: /* in C comment */
       if (c == '*')
 	state = 48;
       else
@@ -1457,6 +1518,7 @@ String *Preprocessor_parse(String *s) {
 	  m = Preprocessor_define(value, 0);
 	  if ((m) && !(Getattr(m, kpp_args))) {
 	    v = Copy(Getattr(m, kpp_value));
+	    copy_location(m, v);
 	    if (Len(v)) {
 	      Swig_error_silent(1);
 	      v1 = Preprocessor_replace(v);
@@ -1525,7 +1587,9 @@ String *Preprocessor_parse(String *s) {
 	level++;
 	if (allow) {
 	  int val;
-	  String *sval = Preprocessor_replace(value);
+	  String *sval;
+	  expand_defined_operator = 1;
+	  sval = Preprocessor_replace(value);
 	  start_level = level;
 	  Seek(sval, 0, SEEK_SET);
 	  /*      Printf(stdout,"Evaluating '%s'\n", sval); */
@@ -1541,6 +1605,7 @@ String *Preprocessor_parse(String *s) {
 	    if (val == 0)
 	      allow = 0;
 	  }
+	  expand_defined_operator = 0;
 	  mask = 1;
 	}
       } else if (Equal(id, kpp_elif)) {
@@ -1548,6 +1613,7 @@ String *Preprocessor_parse(String *s) {
 	  Swig_error(Getfile(s), Getline(id), "Misplaced #elif.\n");
 	} else {
 	  cond_lines[level - 1] = Getline(id);
+	  expand_defined_operator = 1;
 	  if (allow) {
 	    allow = 0;
 	    mask = 0;
@@ -1570,6 +1636,7 @@ String *Preprocessor_parse(String *s) {
 		allow = 0;
 	    }
 	  }
+	  expand_defined_operator = 0;
 	}
       } else if (Equal(id, kpp_warning)) {
 	if (allow) {
@@ -1589,12 +1656,14 @@ String *Preprocessor_parse(String *s) {
 	  String *s1, *s2, *fn;
 	  char *dirname;
 	  int sysfile = 0;
+	  String *filename_processed;
 	  if (include_all && import_all) {
 	    Swig_warning(WARN_PP_INCLUDEALL_IMPORTALL, Getfile(s), Getline(id), "Both includeall and importall are defined: using includeall\n");
 	    import_all = 0;
 	  }
-	  Seek(value, 0, SEEK_SET);
-	  fn = get_filename(value, &sysfile);
+	  filename_processed = Preprocessor_replace(value);
+	  Seek(filename_processed, 0, SEEK_SET);
+	  fn = get_filename(filename_processed, &sysfile);
 	  s1 = cpp_include(fn, sysfile);
 	  if (s1) {
 	    if (include_all)
@@ -1614,7 +1683,7 @@ String *Preprocessor_parse(String *s) {
 	    }
 	    s2 = Preprocessor_parse(s1);
 	    addline(ns, s2, allow);
-	    Append(ns, "\n]");
+	    Append(ns, "]");
 	    if (dirname) {
 	      Swig_pop_directory();
 	    }
@@ -1622,8 +1691,8 @@ String *Preprocessor_parse(String *s) {
 	      pop_imported();
 	    }
 	    Delete(s2);
+	    Delete(s1);
 	  }
-	  Delete(s1);
 	  Delete(fn);
 	}
       } else if (Equal(id, kpp_pragma)) {
@@ -1658,8 +1727,8 @@ String *Preprocessor_parse(String *s) {
       /* %{,%} block  */
       if (c == '{') {
 	start_line = Getline(s);
-	add_chunk(ns, chunk, allow);
 	copy_location(s, chunk);
+	add_chunk(ns, chunk, allow);
 	Putc('%', chunk);
 	Putc(c, chunk);
 	state = 105;
@@ -1720,9 +1789,13 @@ String *Preprocessor_parse(String *s) {
 	Ungetc(c, s);
 	/* Look for common SWIG directives  */
 	if (Equal(decl, kpp_dinclude) || Equal(decl, kpp_dimport) || Equal(decl, kpp_dextern)) {
-	  /* Got some kind of file inclusion directive  */
+	  /* Got some kind of file inclusion directive, eg: %import(option1="value1") "filename" */
 	  if (allow) {
 	    DOH *s1, *s2, *fn, *opt;
+	    String *options_whitespace = NewStringEmpty();
+	    String *filename_whitespace = NewStringEmpty();
+	    String *filename_unprocessed = NewStringEmpty();
+	    String *filename_processed;
 	    int sysfile = 0;
 
 	    if (Equal(decl, kpp_dextern)) {
@@ -1730,14 +1803,25 @@ String *Preprocessor_parse(String *s) {
 	      Clear(decl);
 	      Append(decl, "%%import");
 	    }
+	    skip_whitespace(s, options_whitespace);
 	    opt = get_options(s);
-	    fn = get_filename(s, &sysfile);
+
+	    skip_whitespace(s, filename_whitespace);
+	    copy_location(s, filename_unprocessed);
+	    while (((c = Getc(s)) != EOF) && (!isspace(c)))
+	      Putc(c, filename_unprocessed);
+	    if (isspace(c))
+	      Ungetc(c, s);
+	    filename_processed = Preprocessor_replace(filename_unprocessed);
+	    Seek(filename_processed, 0, SEEK_SET);
+
+	    fn = get_filename(filename_processed, &sysfile);
 	    s1 = cpp_include(fn, sysfile);
 	    if (s1) {
 	      char *dirname;
-	      add_chunk(ns, chunk, allow);
 	      copy_location(s, chunk);
-	      Printf(ns, "%sfile%s \"%s\" [\n", decl, opt, Swig_filename_escape(Swig_last_file()));
+	      add_chunk(ns, chunk, allow);
+	      Printf(ns, "%sfile%s%s%s\"%s\" [\n", decl, options_whitespace, opt, filename_whitespace, Swig_filename_escape(Swig_last_file()));
 	      if (Equal(decl, kpp_dimport)) {
 		push_imported();
 	      }
@@ -1756,11 +1840,15 @@ String *Preprocessor_parse(String *s) {
 		pop_imported();
 	      }
 	      addline(ns, s2, allow);
-	      Append(ns, "\n]");
+	      Append(ns, "]");
 	      Delete(s2);
 	      Delete(s1);
 	    }
 	    Delete(fn);
+	    Delete(filename_processed);
+	    Delete(filename_unprocessed);
+	    Delete(filename_whitespace);
+	    Delete(options_whitespace);
 	  }
 	  state = 1;
 	} else if (Equal(decl, kpp_dline)) {
@@ -1769,8 +1857,8 @@ String *Preprocessor_parse(String *s) {
 	} else if (Equal(decl, kpp_ddefine)) {
 	  /* Got a define directive  */
 	  dlevel++;
-	  add_chunk(ns, chunk, allow);
 	  copy_location(s, chunk);
+	  add_chunk(ns, chunk, allow);
 	  Clear(value);
 	  copy_location(s, value);
 	  state = 150;
@@ -1815,7 +1903,6 @@ String *Preprocessor_parse(String *s) {
 		  Seek(value, 0, SEEK_SET);
 		  Preprocessor_define(value, 1);
 		}
-		/* Putc('\n',ns); */
 		addline(ns, value, 0);
 		state = 0;
 	      }
@@ -1844,8 +1931,9 @@ String *Preprocessor_parse(String *s) {
   if ((state >= 30) && (state < 40)) {
     Swig_error(Getfile(s), -1, "Unterminated comment starting on line %d\n", start_line);
   }
-  add_chunk(ns, chunk, allow);
+
   copy_location(s, chunk);
+  add_chunk(ns, chunk, allow);
 
   /*  DelScope(scp); */
   Delete(decl);
@@ -1854,6 +1942,5 @@ String *Preprocessor_parse(String *s) {
   Delete(comment);
   Delete(chunk);
 
-  /*  fprintf(stderr,"cpp: %d\n", Len(Getattr(cpp,"symbols"))); */
   return ns;
 }
