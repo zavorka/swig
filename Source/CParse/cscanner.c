@@ -50,6 +50,9 @@ static int last_brace = 0;
 static int last_id = 0;
 static int rename_active = 0;
 
+/* Doxygen comments scanning */
+int scan_doxygen_comments = 0;
+
 /* -----------------------------------------------------------------------------
  * Swig_cparse_cplusplus()
  * ----------------------------------------------------------------------------- */
@@ -371,6 +374,25 @@ static int yylook(void) {
 	char *loc = Char(cmt);
 	if ((strncmp(loc,"/*@SWIG",7) == 0) && (loc[Len(cmt)-3] == '@')) {
 	  Scanner_locator(scan, cmt);
+	}
+	if (scan_doxygen_comments) { /* else just skip this node, to avoid crashes in parser module*/
+	  if (strncmp(loc, "/**<", 4) == 0 || strncmp(loc, "///<", 4) == 0||strncmp(loc, "/*!<", 4) == 0||strncmp(loc, "//!<", 4) == 0) {
+	    /* printf("Doxygen Post Comment: %s lines %d-%d [%s]\n", Char(Scanner_file(scan)), Scanner_start_line(scan), Scanner_line(scan), loc); */
+	    yylval.str =  NewString(loc);
+	    Setline(yylval.str, Scanner_start_line(scan));
+	    Setfile(yylval.str, Scanner_file(scan));
+	    return DOXYGENPOSTSTRING;
+	  }
+	  if (strncmp(loc, "/**", 3) == 0 || strncmp(loc, "///", 3) == 0||strncmp(loc, "/*!", 3) == 0||strncmp(loc, "//!", 3) == 0) {
+	    /* printf("Doxygen Comment: %s lines %d-%d [%s]\n", Char(Scanner_file(scan)), Scanner_start_line(scan), Scanner_line(scan), loc); */
+	    /* ignore comments like / * * * and / * * /,  which are also ignored by Doxygen */
+	    if (loc[3] != '*'  &&  loc[3] != '/') {
+	      yylval.str =  NewString(loc);
+	      Setline(yylval.str, Scanner_start_line(scan));
+	      Setfile(yylval.str, Scanner_file(scan));
+	      return DOXYGENSTRING;
+	    }
+	  }
 	}
       }
       break;
@@ -902,6 +924,8 @@ int yylex(void) {
     return (ID);
   case POUND:
     return yylex();
+  case SWIG_TOKEN_COMMENT:
+	  return yylex();
   default:
     return (l);
   }
