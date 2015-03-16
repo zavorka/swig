@@ -27,7 +27,6 @@ to work, see Byacc man page: http://invisible-island.net/byacc/manpage/yacc.html
 #include "preprocessor.h"
 #include <ctype.h>
 
-
 /* We do this for portability */
 #undef alloca
 #define alloca malloc
@@ -1243,7 +1242,6 @@ static void default_arguments(Node *n) {
   Node *function = n;
 
   if (function) {
-
     ParmList *varargs = Getattr(function,"feature:varargs");
     if (varargs) {
       /* Handles the %varargs directive by looking for "feature:varargs" and 
@@ -1651,6 +1649,7 @@ declaration    : swig_directive { $$ = $1; }
    COPERATOR token---discarding the rest of the definition. Ugh.
 
  */
+
                | error COPERATOR {
                   $$ = 0;
                   skip_decl();
@@ -2917,7 +2916,6 @@ warn_directive : WARN string {
 		  $$ = 0;
                }
                ;
-
 
 /* ======================================================================
  *                              C Parsing
@@ -4462,8 +4460,8 @@ cpp_members  : cpp_member cpp_members {
 	       appendChild($$,$4);
 	       set_nextSibling($$,$7);
 	     }
-         | include_directive { $$ = $1; }
-         | empty { $$ = 0;}
+             | include_directive { $$ = $1; }
+             | empty { $$ = 0;}
 	     | error {
 	       int start_line = cparse_line;
 	       skip_decl();
@@ -4882,10 +4880,10 @@ parms          : rawparms {
                  Parm *p;
 		 $$ = $1;
 		 p = $1;
-		 while (p) {
+                 while (p) {
 		   Replace(Getattr(p,"type"),"typename ", "", DOH_REPLACE_ANY);
 		   p = nextSibling(p);
-		 }
+                 }
                }
     	       ;
 
@@ -4899,7 +4897,7 @@ rawparms          : parm ptail {
 ptail          : COMMA parm ptail {
                  set_nextSibling($2,$3);
 		 $$ = $2;
-               }
+                }
 	       | COMMA doxygen_post_comment parm ptail {
 		 set_comment(previousNode, $2);
                  set_nextSibling($3,$4);
@@ -4920,6 +4918,7 @@ parm           : rawtype parameter_declarator {
 		     Setattr($$,"value",$2.defarg);
 		   }
 		}
+
                 | TEMPLATE LESSTHAN cpptype GREATERTHAN cpptype idcolon def_args {
                   $$ = NewParmWithoutFileLineInfo(NewStringf("template<class> %s %s", $5,$6), 0);
 		  previousNode = currentNode;
@@ -6888,3 +6887,4 @@ ParmList *Swig_cparse_parms(String *s, Node *file_line_node) {
    /*   Printf(stdout,"typeparse: '%s' ---> '%s'\n", s, top); */
    return top;
 }
+
