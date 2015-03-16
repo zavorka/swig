@@ -563,7 +563,7 @@ public:
     if (cppcast) {
       Preprocessor_define((DOH *) "SWIG_CPLUSPLUS_CAST", 0);
     }
-    
+
     if (doxygen)
       doxygenTranslator = new PyDocConverter(doxygen_translator_flags);
 

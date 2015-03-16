@@ -49,7 +49,7 @@ class JAVA:public Language {
   bool member_func_flag;	// flag set when wrapping a member function
   bool doxygen;			//flag for converting found doxygen to javadoc
   bool comment_creation_chatter; //flag for getting information about where comments were created in java.cxx
-  
+
   String *imclass_name;		// intermediary class name
   String *module_class_name;	// module class name
   String *constants_interface_name;	// constants interface name
@@ -169,7 +169,7 @@ public:
     director_multiple_inheritance = 0;
     director_language = 1;
   }
-  
+
   ~JAVA() {
     delete doxygenTranslator;
   }
@@ -317,7 +317,7 @@ public:
 	}
       }
     }
-    
+
     if (doxygen)
       doxygenTranslator = new JavaDocConverter(doxygen_translator_flags);
 
@@ -589,7 +589,7 @@ public:
 
       if (module_imports)
 	Printf(f_module, "%s\n", module_imports);
-      
+
       if (doxygen && doxygenTranslator->hasDocumentation(n)){
 	String *doxygen_comments=doxygenTranslator->getDocumentation(n);
 	if(comment_creation_chatter)
@@ -1020,7 +1020,7 @@ public:
       Delete(c_param_type);
       Delete(arg);
     }
-    
+
     Printv(f->code, nondir_args, NIL);
     Delete(nondir_args);
 
@@ -1347,7 +1347,7 @@ public:
 	  // Add extra indentation
 	  Replaceall(enum_code, "\n", "\n  ");
 	  Replaceall(enum_code, "  \n", "\n");
-	    
+
 	  Printv(proxy_class_constants_code, "  ", enum_code, "\n\n", NIL);
 	} else {
 	  // Global enums are defined in their own file
@@ -1376,7 +1376,7 @@ public:
 
 	  Printv(f_enum, typemapLookup(n, "javaimports", typemap_lookup_type, WARN_NONE), // Import statements
 		 "\n\n", NIL);
-	  
+
 	  //translate and write javadoc comment if flagged
 	  if (doxygen && doxygenTranslator->hasDocumentation(n)){
 	    String *doxygen_comments=doxygenTranslator->getDocumentation(n);
@@ -1385,7 +1385,7 @@ public:
 	    Printv(f_enum, Char(doxygen_comments), NIL);
 	    Delete(doxygen_comments);
 	  }
-	  
+
 	  Printv(f_enum, enum_code, "\n", NIL);
 
 	  Printf(f_enum, "\n");
@@ -1438,7 +1438,7 @@ public:
       tmpValue = NewString(name);
     // Note that this is used in enumValue() amongst other places
     Setattr(n, "value", tmpValue);
-    
+
     // Deal with enum values that are not int
     int swigtype = SwigType_type(Getattr(n, "type"));
     if (swigtype == T_BOOL) {
@@ -1479,7 +1479,7 @@ public:
       }
       if (!addSymbol(symname, n, scope))
 	return SWIG_ERROR;
-      
+
       //translate and write javadoc comment if flagged
       if (doxygen && doxygenTranslator->hasDocumentation(n)){
 	String *doxygen_comments=doxygenTranslator->getDocumentation(n);
@@ -1561,7 +1561,7 @@ public:
     }
     return SWIG_OK;
   }
-  
+
   /* -----------------------------------------------------------------------
    * constantWrapper()
    * Used for wrapping constants - #define or %constant.
@@ -1580,7 +1580,6 @@ public:
     String *tm;
     String *return_type = NewString("");
     String *constants_code = NewString("");
-    
     Swig_save("constantWrapper", n, "value", NIL);
 
     //translate and write javadoc comment if flagged
@@ -1591,7 +1590,7 @@ public:
       Printv(constants_code, Char(doxygen_comments), NIL);
       Delete(doxygen_comments);
     }
-    
+
     bool is_enum_item = (Cmp(nodeType(n), "enumitem") == 0);
 
     const String *itemname = (proxy_flag && wrapping_member_flag) ? variable_name : symname;
@@ -1898,7 +1897,7 @@ public:
 
     // Pure Java interfaces
     const String *pure_interfaces = typemapLookup(n, "javainterfaces", typemap_lookup_type, WARN_NONE);
-    
+
     //translate and write javadoc comment if flagged
     if (doxygen && doxygenTranslator->hasDocumentation(n)){
       String *doxygen_comments=doxygenTranslator->getDocumentation(n);
@@ -1907,7 +1906,7 @@ public:
       Printv(proxy_class_def, Char(doxygen_comments), NIL);
       Delete(doxygen_comments);
     }
-    
+
     // Start writing the proxy class
     if (!has_outerclass) // Import statements
       Printv(proxy_class_def, typemapLookup(n, "javaimports", typemap_lookup_type, WARN_NONE),"\n", NIL);
@@ -2364,7 +2363,7 @@ public:
       // For wrapping member variables (Javabean setter)
       setter_flag = (Cmp(Getattr(n, "sym:name"), Swig_name_set(getNSpace(), Swig_name_member(0, getClassPrefix(), variable_name))) == 0);
     }
-    
+
     //translate and write javadoc comment if flagged
     if (doxygen && doxygenTranslator->hasDocumentation(n)){
       String *doxygen_comments=doxygenTranslator->getDocumentation(n);
@@ -2373,7 +2372,7 @@ public:
       Printv(function_code, Char(doxygen_comments), NIL);
       Delete(doxygen_comments);
     }
-    
+
     /* Start generating the proxy function */
     const String *methodmods = Getattr(n, "feature:java:methodmodifiers");
     methodmods = methodmods ? methodmods : (is_public(n) ? public_string : protected_string);
@@ -2595,7 +2594,7 @@ public:
 
       tm = Getattr(n, "tmap:jtype"); // typemaps were attached earlier to the node
       Printf(im_return_type, "%s", tm);
-      
+
       //translate and write javadoc comment if flagged
     if (doxygen && doxygenTranslator->hasDocumentation(n)){
       String *doxygen_comments=doxygenTranslator->getDocumentation(n);
@@ -2604,7 +2603,7 @@ public:
 	Printv(function_code, Char(doxygen_comments), NIL);
 	Delete(doxygen_comments);
       }
-	    
+
       Printf(function_code, "  %s %s(", methodmods, proxy_class_name);
       Printf(helper_code, "  static private %s SwigConstruct%s(", im_return_type, proxy_class_name);
 
@@ -2865,7 +2864,7 @@ public:
     bool setter_flag = false;
     String *pre_code = NewString("");
     String *post_code = NewString("");
-    
+
     // translate and write javadoc comment if flagged
     if (doxygen && doxygenTranslator->hasDocumentation(n)){
       String *doxygen_comments=doxygenTranslator->getDocumentation(n);
@@ -3293,7 +3292,6 @@ public:
     const String *pure_baseclass = typemapLookup(n, "javabase", type, WARN_NONE);
     const String *pure_interfaces = typemapLookup(n, "javainterfaces", type, WARN_NONE);
 
-    
     // Emit the class
     Printv(swigtype, typemapLookup(n, "javaimports", type, WARN_NONE),	// Import statements
 	   "\n", typemapLookup(n, "javaclassmodifiers", type, WARN_JAVA_TYPEMAP_CLASSMOD_UNDEF),	// Class modifiers
@@ -4758,4 +4756,3 @@ Java Options (available with -java)\n\
      -oldvarnames    - Old intermediary method names for variable wrappers\n\
      -package <name> - Set name of the Java package to <name>\n\
 \n";
-

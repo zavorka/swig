@@ -86,7 +86,7 @@ public:
 
   /* Doxygen Comment */
   virtual int doxygenComment(Node *n);
-  
+
   /* C/C++ parsing */
 
   virtual int cDeclaration(Node *n);
@@ -169,7 +169,7 @@ public:
 
   /* C/C++ parsing */
   virtual int doxygenComment(Node *n);
-  
+
   /* Function handlers */
 
   virtual int functionHandler(Node *n);
