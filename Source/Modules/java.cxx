@@ -1319,6 +1319,7 @@ public:
 	  Delete(doxygen_comments);
 	}
 	else if (symname && !Getattr(n, "unnamedinstance"))
+	  // Wrap C++ enum with integers - just indicate start of enum with a comment, no comment for anonymous enums of any sort
 	  Printf(constants_code, "  // %s \n", symname);
       }
 
