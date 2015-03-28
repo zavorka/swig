@@ -14,7 +14,7 @@ public:
   }
   virtual ~Shape() {
     nshapes--;
-  };
+  }
   double  x, y; /*!< Important variables  */
   void    move(double dx, double dy);
   virtual double area(void) = 0; /*!< \return the area \exception exception description */
@@ -38,7 +38,7 @@ class Square : public Shape {
 private:
   double width;
 public:
-  Square(double w) : width(w) { }; /*!< Create square
+  Square(double w) : width(w) { } /*!< Create square
 					/param w the width
 					/exception some description */
   virtual double area(void);
