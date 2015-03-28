@@ -908,7 +908,7 @@ int yylex(void) {
 	return (WARN);
 
       /* Note down the apparently unknown directive for error reporting. */
-      cparse_unknown_directive = Swig_copy_string(yytext);
+      cparse_unknown_directive = NewString(yytext);
     }
     /* Have an unknown identifier, as a last step, we'll do a typedef lookup on it. */
 

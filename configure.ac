@@ -1745,19 +1745,18 @@ AC_SUBST(PHPINC)
 # Look for ocaml
 #----------------------------------------------------------------
 
-AC_ARG_WITH(ocaml, AS_HELP_STRING([--without-ocaml], [Disable OCaml])
-AS_HELP_STRING([--with-ocaml=path], [Set location of ocaml executable]),[ OCAMLBIN="$withval"], [OCAMLBIN=yes])
+AC_ARG_WITH(ocaml, AS_HELP_STRING([--without-ocaml], [Disable OCaml]), [with_ocaml="$withval"], [with_ocaml=yes])
 AC_ARG_WITH(ocamlc,[  --with-ocamlc=path      Set location of ocamlc executable],[ OCAMLC="$withval"], [OCAMLC=])
 AC_ARG_WITH(ocamldlgen,[  --with-ocamldlgen=path  Set location of ocamldlgen],[ OCAMLDLGEN="$withval" ], [OCAMLDLGEN=])
 AC_ARG_WITH(ocamlfind,[  --with-ocamlfind=path   Set location of ocamlfind],[OCAMLFIND="$withval"],[OCAMLFIND=])
 AC_ARG_WITH(ocamlmktop,[  --with-ocamlmktop=path  Set location of ocamlmktop executable],[ OCAMLMKTOP="$withval"], [OCAMLMKTOP=])
+AC_ARG_WITH(camlp4,[  --with-camlp4=path  Set location of camlp4 executable],[ CAMLP4="$withval"], [CAMLP4=])
 
 # First, check for "--without-ocaml" or "--with-ocaml=no".
-if test x"${OCAMLBIN}" = xno -o x"${with_alllang}" = xno ; then
+if test x"${with_ocaml}" = xno -o x"${with_alllang}" = xno ; then
     AC_MSG_NOTICE([Disabling OCaml])
-    OCAMLBIN=
+    OCAMLC=
 else
-
     AC_MSG_CHECKING(for Ocaml DL load generator)
     if test -z "$OCAMLDLGEN"; then
 	AC_CHECK_PROGS(OCAMLDLGEN, ocamldlgen, :)
@@ -1773,60 +1772,22 @@ else
 	AC_CHECK_PROGS(OCAMLC, ocamlc, :)
     fi
 
-    AC_MSG_CHECKING(for Ocaml interpreter)
-	if test "x$OCAMLBIN" = xyes; then
-	AC_CHECK_PROGS(OCAMLBIN, ocaml, :)
-    fi
-
     AC_MSG_CHECKING(for Ocaml toplevel creator)
     if test -z "$OCAMLMKTOP"; then
 	AC_CHECK_PROGS(OCAMLMKTOP, ocamlmktop, :)
     fi
 
-    OCAMLLOC=loc
-    if test "$OCAMLC" != ":" ; then
-	AC_MSG_CHECKING(for Ocaml header files)
-	dirs="/usr/lib/ocaml/caml /usr/local/lib/ocaml/caml"
-	dir="`$OCAMLC -where 2>/dev/null`"
-	if test "$dir"; then
-		dirs="$dir/caml $dirs"
-	fi
-	for i in $dirs; do
-		if test -r $i/mlvalues.h; then
-			AC_MSG_RESULT($i)
-			OCAMLEXT="$i"
-			OCAMLINC="-I$OCAMLEXT"
-			break
-		fi
-	done
-	if test -z "$OCAMLINC"; then
-		AC_MSG_RESULT(not found)
-	fi
-
-	AC_MSG_CHECKING(for Ocaml version 3.08.2 or higher)
-	OCAMLVER=`$OCAMLC -version | sed -e 's/.*version //g'`
-	AC_COMPARE_VERSION([$OCAMLVER],[3.08.2],[:],[:],[OCAMLLOC=_loc])
-	AC_MSG_RESULT($OCAMLVER)
+    AC_MSG_CHECKING(for Ocaml Pre-Processor-Pretty-Printer)
+    if test -z "$CAMLP4"; then
+	AC_CHECK_PROGS(CAMLP4, camlp4, :)
     fi
 fi # Disabling ocaml
 
-export OCAMLLOC
-export OCAMLVER
-export OCAMLINC
-export OCAMLBIN
-export OCAMLC
-export OCAMLDLGEN
-export OCAMLFIND
-export OCAMLMKTOP
-
-AC_SUBST(OCAMLLOC)
-AC_SUBST(OCAMLVER)
-AC_SUBST(OCAMLINC)
-AC_SUBST(OCAMLBIN)
 AC_SUBST(OCAMLC)
 AC_SUBST(OCAMLDLGEN)
 AC_SUBST(OCAMLFIND)
 AC_SUBST(OCAMLMKTOP)
+AC_SUBST(CAMLP4)
 
 #----------------------------------------------------------------
 # Look for Pike
@@ -2333,8 +2294,6 @@ else
     GO="$GOBIN"
   fi
 
-  AC_CHECK_PROGS(GCCGO, gccgo)
-
   GOGCC=false
   GCCGO=
   GO1=false
@@ -2345,61 +2304,67 @@ else
   GCCGOOPT=
   GOVERSIONOPTION=
 
-  GO1=true
-  GOVERSIONOPTION=version
-  GOC=$(sh -c "$(go env) && echo \$GOCHAR")c
-  go_version=$($GO $GOVERSIONOPTION | sed -e 's/go version //')
-  AC_MSG_CHECKING([whether go version is too old])
-  case $go_version in
-  go1.0* | go1 )
-    AC_MSG_RESULT([yes - minimum version is 1.1])
-    GO=
-    GOOPT="-intgosize 32"
-    ;;
-  *)
-    AC_MSG_RESULT([no])
-    if test "$GOC" = "6c"; then
-      GOOPT="-intgosize 64"
-    else
+  if test -n "$GO" ; then
+    GO1=true
+    GOVERSIONOPTION=version
+    GOC=$(sh -c "$(go env) && echo \$GOCHAR")c
+    go_version=$($GO $GOVERSIONOPTION | sed -e 's/go version //')
+    AC_MSG_CHECKING([whether go version is too old])
+    case $go_version in
+    go1.0* | go1 )
+      AC_MSG_RESULT([yes - minimum version is 1.1])
+      GO=
       GOOPT="-intgosize 32"
-    fi
-    ;;
-  esac
-  case $go_version in
-  go1.0* | go1 | go1.1*)
-    GOOPT="$GOOPT -use-shlib"
-    ;;
-  go1.2*)
-    GO12=true
-    ;;
-  go1.3* | go1.4*)
-    GO13=true
-    ;;
-  *)
-    GO15=true
-    ;;
-  esac
-
-  if $GCCGO --help 2>/dev/null | grep gccgo >/dev/null 2>&1 ; then
-    AC_MSG_CHECKING([whether gccgo version is too old])
-    go_version=[`$GO $GOVERSIONOPTION | sed -n '1p' | sed -e 's/^.* \([0-9.]*\) *$/\1/' -e 's/[.]//g'`]
-    if test "x$go_version" = x; then
-      AC_MSG_RESULT([could not determine gccgo version])
-      GCCGO=
-    elif test "$go_version" -lt 470; then
-      AC_MSG_RESULT([yes - minimum version is 4.7.0])
-      GCCGO=
-    else
+      ;;
+    *)
       AC_MSG_RESULT([no])
-      if test "$go_version" -lt 480; then
-        GCCGOOPT="-intgosize 32"
+      if test "$GOC" = "6c"; then
+        GOOPT="-intgosize 64"
       else
-	AC_CHECK_SIZEOF([void *], [4])
-	if test "$ac_cv_sizeof_void_p" = "8"; then
-	  GCCGOOPT="-intgosize 64"
-	else
-	  GCCGOOPT="-intgosize 32"
-	fi
+        GOOPT="-intgosize 32"
+      fi
+      ;;
+    esac
+    case $go_version in
+    go1.0* | go1 | go1.1*)
+      GOOPT="$GOOPT -use-shlib"
+      ;;
+    go1.2*)
+      GO12=true
+      ;;
+    go1.3* | go1.4*)
+      GO13=true
+      ;;
+    *)
+      GO15=true
+      ;;
+    esac
+  fi
+
+  AC_CHECK_PROGS(GCCGO, gccgo)
+
+  if test -n "$GCCGO" ; then
+    if $GCCGO --help 2>/dev/null | grep gccgo >/dev/null 2>&1 ; then
+      AC_MSG_CHECKING([whether gccgo version is too old])
+      go_version=[`$GO $GOVERSIONOPTION | sed -n '1p' | sed -e 's/^.* \([0-9.]*\) *$/\1/' -e 's/[.]//g'`]
+      if test "x$go_version" = x; then
+        AC_MSG_RESULT([could not determine gccgo version])
+        GCCGO=
+      elif test "$go_version" -lt 470; then
+        AC_MSG_RESULT([yes - minimum version is 4.7.0])
+        GCCGO=
+      else
+        AC_MSG_RESULT([no])
+        if test "$go_version" -lt 480; then
+          GCCGOOPT="-intgosize 32"
+        else
+          AC_CHECK_SIZEOF([void *], [4])
+          if test "$ac_cv_sizeof_void_p" = "8"; then
+            GCCGOOPT="-intgosize 64"
+          else
+            GCCGOOPT="-intgosize 32"
+          fi
+        fi
       fi
     fi
   fi
@@ -2580,7 +2545,7 @@ AC_SUBST(SKIP_PHP)
 
 
 SKIP_OCAML=
-if test -z "$OCAMLBIN" || test -z "$OCAMLINC" ; then
+if test -z "$OCAMLC" ; then
     SKIP_OCAML="1"
 fi
 AC_SUBST(SKIP_OCAML)
