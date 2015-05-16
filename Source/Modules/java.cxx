@@ -47,8 +47,8 @@ class JAVA:public Language {
   bool global_variable_flag;	// Flag for when wrapping a global variable
   bool old_variable_names;	// Flag for old style variable names in the intermediary class
   bool member_func_flag;	// flag set when wrapping a member function
-  bool doxygen;			//flag for converting found doxygen to javadoc
-  bool comment_creation_chatter; //flag for getting information about where comments were created in java.cxx
+  bool doxygen;			// Flag for converting found doxygen to javadoc
+  bool comment_creation_chatter;// Flag for adding debug information about where comments were created
 
   String *imclass_name;		// intermediary class name
   String *module_class_name;	// module class name
@@ -80,7 +80,7 @@ class JAVA:public Language {
   String *imclass_cppcasts_code;	//C++ casts up inheritance hierarchies intermediary class code
   String *imclass_directors;	// Intermediate class director code
   String *destructor_call;	//C++ destructor call if any
-  String *structuralComments;
+  String *structual_comments;
   String *destructor_throws_clause;	//C++ destructor throws clause if any
 
   // Director method stuff:
@@ -155,7 +155,7 @@ public:
       imclass_cppcasts_code(NULL),
       imclass_directors(NULL),
       destructor_call(NULL),
-      structuralComments(NULL),
+      structual_comments(NULL),
       destructor_throws_clause(NULL),
       dmethods_seq(NULL),
       dmethods_table(NULL),
@@ -171,7 +171,7 @@ public:
   }
 
   ~JAVA() {
-    delete doxygenTranslator;
+    delete doxygen_translator;
   }
 
   /* -----------------------------------------------------------------------------
@@ -319,7 +319,7 @@ public:
     }
 
     if (doxygen)
-      doxygenTranslator = new JavaDocConverter(doxygen_translator_flags);
+      doxygen_translator = new JavaDocConverter(doxygen_translator_flags);
 
     // Add a symbol to the parser for conditional compilation
     Preprocessor_define("SWIGJAVA 1", 0);
@@ -441,7 +441,7 @@ public:
     imclass_imports = NewString("");
     imclass_cppcasts_code = NewString("");
     imclass_directors = NewString("");
-    structuralComments = NewString("");
+    structual_comments = NewString("");
     upcasts_code = NewString("");
     dmethods_seq = NewList();
     dmethods_table = NewHash();
@@ -580,19 +580,18 @@ public:
 
       // Start writing out the module class file
       emitBanner(f_module);
-      //Add any structural comments to the top
-      if(doxygen && structuralComments){
-    	  Printf(f_module, "%s", structuralComments);
-      }
+      // Add any structural comments to the top
+      if (doxygen && structual_comments)
+	Printf(f_module, "%s", structual_comments);
       if (package)
 	Printf(f_module, "package %s;\n", package);
 
       if (module_imports)
 	Printf(f_module, "%s\n", module_imports);
 
-      if (doxygen && doxygenTranslator->hasDocumentation(n)){
-	String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-	if(comment_creation_chatter)
+      if (doxygen && doxygen_translator->hasDocumentation(n)) {
+	String *doxygen_comments = doxygen_translator->getDocumentation(n);
+	if (comment_creation_chatter)
 	  Printf(f_module, "/* This was generated from top() */");
 	Printv(f_module, Char(doxygen_comments), NIL);
 	Delete(doxygen_comments);
@@ -728,8 +727,8 @@ public:
     module_imports = NULL;
     Delete(module_class_modifiers);
     module_class_modifiers = NULL;
-    Delete(structuralComments);
-    structuralComments = NULL;
+    Delete(structual_comments);
+    structual_comments = NULL;
     Delete(imclass_imports);
     imclass_imports = NULL;
     Delete(imclass_cppcasts_code);
@@ -1275,15 +1274,14 @@ public:
       EnumFeature enum_feature = decodeEnumFeature(n);
       String *typemap_lookup_type = Getattr(n, "name");
 
-      if (doxygen && doxygenTranslator->hasDocumentation(n)){
-        String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-        if(comment_creation_chatter) {
+      if (doxygen && doxygen_translator->hasDocumentation(n)) {
+        String *doxygen_comments = doxygen_translator->getDocumentation(n);
+        if (comment_creation_chatter) {
           Printf(enum_code, "/* This was generated from enumvalueDeclaration() */");
         }
         Printv(enum_code, Char(doxygen_comments), NIL);
         Delete(doxygen_comments);
       }
-
 
       if ((enum_feature != SimpleEnum) && symname && typemap_lookup_type) {
 	// Wrap (non-anonymous) C/C++ enum within a typesafe, typeunsafe or proper Java enum
@@ -1307,13 +1305,12 @@ public:
 	  Replaceall(enum_code, "$static ", "");
 	Delete(scope);
       } else {
-	//translate and write javadoc comment for the enum itself if flagged
-	if (doxygen && doxygenTranslator->hasDocumentation(n)){
-	  String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-	  if(comment_creation_chatter)
+	// Translate and write javadoc comment for the enum itself if flagged
+	if (doxygen && doxygen_translator->hasDocumentation(n)) {
+	  String *doxygen_comments = doxygen_translator->getDocumentation(n);
+	  if (comment_creation_chatter)
 	    Printf(constants_code, "/* This was generated from enumDeclaration() */");
-	  Printf(constants_code, "/* Comment for enum %s */\n",
-		 Getattr(n, "unnamedinstance") ? "" : symname);
+	  Printf(constants_code, "/* Comment for enum %s */\n", Getattr(n, "unnamedinstance") ? "" : symname);
 	  Printf(constants_code, Char(doxygen_comments));
 	  Printf(constants_code, "\n");
 	  Delete(doxygen_comments);
@@ -1378,10 +1375,10 @@ public:
 	  Printv(f_enum, typemapLookup(n, "javaimports", typemap_lookup_type, WARN_NONE), // Import statements
 		 "\n\n", NIL);
 
-	  //translate and write javadoc comment if flagged
-	  if (doxygen && doxygenTranslator->hasDocumentation(n)){
-	    String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-	    if(comment_creation_chatter)
+	  // Translate and write javadoc comment if flagged
+	  if (doxygen && doxygen_translator->hasDocumentation(n)) {
+	    String *doxygen_comments = doxygen_translator->getDocumentation(n);
+	    if (comment_creation_chatter)
 	      Printf(f_enum, "/* This was generated from enumDeclaration() */");
 	    Printv(f_enum, Char(doxygen_comments), NIL);
 	    Delete(doxygen_comments);
@@ -1481,10 +1478,10 @@ public:
       if (!addSymbol(symname, n, scope))
 	return SWIG_ERROR;
 
-      //translate and write javadoc comment if flagged
-      if (doxygen && doxygenTranslator->hasDocumentation(n)){
-	String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-	if(comment_creation_chatter)
+      // Translate and write javadoc comment if flagged
+      if (doxygen && doxygen_translator->hasDocumentation(n)) {
+	String *doxygen_comments = doxygen_translator->getDocumentation(n);
+	if (comment_creation_chatter)
 	  Printf(enum_code, "/* This was generated from enumvalueDeclaration() */");
 	Printv(enum_code, Char(doxygen_comments), NIL);
 	Delete(doxygen_comments);
@@ -1493,7 +1490,6 @@ public:
       if ((enum_feature == ProperEnum) && parent_name && !unnamedinstance) {
 	// Wrap (non-anonymous) C/C++ enum with a proper Java enum
 	// Emit the enum item.
-	
 	Printf(enum_code, "  %s", symname);
 	if (Getattr(n, "enumvalue")) {
 	  String *value = enumValue(n);
@@ -1549,15 +1545,16 @@ public:
 
   /* -----------------------------------------------------------------------
    * doxygenComment()
+   *
    * Simply translates the doxygen comment and places it into the appropriate
    * file
    * ------------------------------------------------------------------------ */
   virtual int doxygenComment(Node *n){
-    if (doxygen && doxygenTranslator->hasDocumentation(n)){
-      String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-      if(comment_creation_chatter)
-	Printf(structuralComments, "/* This was generated from doxygenComment() */");
-      Printv(structuralComments, Char(doxygen_comments), NIL);
+    if (doxygen && doxygen_translator->hasDocumentation(n)) {
+      String *doxygen_comments = doxygen_translator->getDocumentation(n);
+      if (comment_creation_chatter)
+	Printf(structual_comments, "/* This was generated from doxygenComment() */");
+      Printv(structual_comments, Char(doxygen_comments), NIL);
       Delete(doxygen_comments);
     }
     return SWIG_OK;
@@ -1565,6 +1562,7 @@ public:
 
   /* -----------------------------------------------------------------------
    * constantWrapper()
+   *
    * Used for wrapping constants - #define or %constant.
    * Also for inline initialised const static primitive type member variables (short, int, double, enums etc).
    * Java static final variables are generated for these.
@@ -1583,10 +1581,10 @@ public:
     String *constants_code = NewString("");
     Swig_save("constantWrapper", n, "value", NIL);
 
-    //translate and write javadoc comment if flagged
-    if (doxygen && doxygenTranslator->hasDocumentation(n)){
-      String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-      if(comment_creation_chatter)
+    // Translate and write javadoc comment if flagged
+    if (doxygen && doxygen_translator->hasDocumentation(n)) {
+      String *doxygen_comments = doxygen_translator->getDocumentation(n);
+      if (comment_creation_chatter)
 	Printf(constants_code, "/* This was generated from constantWrapper() */");
       Printv(constants_code, Char(doxygen_comments), NIL);
       Delete(doxygen_comments);
@@ -1899,10 +1897,10 @@ public:
     // Pure Java interfaces
     const String *pure_interfaces = typemapLookup(n, "javainterfaces", typemap_lookup_type, WARN_NONE);
 
-    //translate and write javadoc comment if flagged
-    if (doxygen && doxygenTranslator->hasDocumentation(n)){
-      String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-      if(comment_creation_chatter)
+    // Translate and write javadoc comment if flagged
+    if (doxygen && doxygen_translator->hasDocumentation(n)) {
+      String *doxygen_comments = doxygen_translator->getDocumentation(n);
+      if (comment_creation_chatter)
 	Printf(proxy_class_def, "/* This was generated from emitProxyClassDefAndCPPCasts() */");
       Printv(proxy_class_def, Char(doxygen_comments), NIL);
       Delete(doxygen_comments);
@@ -2365,9 +2363,9 @@ public:
       setter_flag = (Cmp(Getattr(n, "sym:name"), Swig_name_set(getNSpace(), Swig_name_member(0, getClassPrefix(), variable_name))) == 0);
     }
 
-    //translate and write javadoc comment if flagged
-    if (doxygen && doxygenTranslator->hasDocumentation(n)){
-      String *doxygen_comments=doxygenTranslator->getDocumentation(n);
+    // Translate and write javadoc comment if flagged
+    if (doxygen && doxygen_translator->hasDocumentation(n)) {
+      String *doxygen_comments = doxygen_translator->getDocumentation(n);
       if(comment_creation_chatter)
 	Printf(function_code, "/* This was generated from proxyclassfunctionhandler() */");
       Printv(function_code, Char(doxygen_comments), NIL);
@@ -2596,10 +2594,10 @@ public:
       tm = Getattr(n, "tmap:jtype"); // typemaps were attached earlier to the node
       Printf(im_return_type, "%s", tm);
 
-      //translate and write javadoc comment if flagged
-    if (doxygen && doxygenTranslator->hasDocumentation(n)){
-      String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-	if(comment_creation_chatter)
+      // Translate and write javadoc comment if flagged
+      if (doxygen && doxygen_translator->hasDocumentation(n)) {
+	String *doxygen_comments = doxygen_translator->getDocumentation(n);
+	if (comment_creation_chatter)
 	  Printf(function_code, "/* This was generated from constructionhandler() */");
 	Printv(function_code, Char(doxygen_comments), NIL);
 	Delete(doxygen_comments);
@@ -2866,10 +2864,10 @@ public:
     String *pre_code = NewString("");
     String *post_code = NewString("");
 
-    // translate and write javadoc comment if flagged
-    if (doxygen && doxygenTranslator->hasDocumentation(n)){
-      String *doxygen_comments=doxygenTranslator->getDocumentation(n);
-      if(comment_creation_chatter)
+    // Translate and write javadoc comment if flagged
+    if (doxygen && doxygen_translator->hasDocumentation(n)) {
+      String *doxygen_comments = doxygen_translator->getDocumentation(n);
+      if (comment_creation_chatter)
 	Printf(function_code, "/* This was generated from moduleClassFunctionHandler() */");
       Printv(function_code, doxygen_comments, NIL);
       Delete(doxygen_comments);

@@ -1385,9 +1385,11 @@ String *Swig_pcre_version(void) {
 
 /* ------------------------------------------------------------
  * Swig_is_generated_overload()
+ *
  * Check if the function is an automatically generated
  * overload created because a method has default parameters. 
  * ------------------------------------------------------------ */
+
 int Swig_is_generated_overload(Node *n) {
   Node *base_method = Getattr(n, "sym:overloaded");
   Node *default_args = Getattr(n, "defaultargs");

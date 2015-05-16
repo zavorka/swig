@@ -925,7 +925,7 @@ int yylex(void) {
   case POUND:
     return yylex();
   case SWIG_TOKEN_COMMENT:
-	  return yylex();
+    return yylex();
   default:
     return (l);
   }

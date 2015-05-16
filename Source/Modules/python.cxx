@@ -263,7 +263,7 @@ public:
   }
 
   ~PYTHON() {
-    delete doxygenTranslator;
+    delete doxygen_translator;
   }
 
   /* ------------------------------------------------------------
@@ -565,7 +565,7 @@ public:
     }
 
     if (doxygen)
-      doxygenTranslator = new PyDocConverter(doxygen_translator_flags);
+      doxygen_translator = new PyDocConverter(doxygen_translator_flags);
 
     if (!global_name)
       global_name = NewString("cvar");
@@ -1488,12 +1488,13 @@ public:
     String *str = Getattr(n, "feature:docstring");
     return ((str && Len(str) > 0)
 	|| (Getattr(n, "feature:autodoc") && !GetFlag(n, "feature:noautodoc"))
-	|| (doxygen && doxygenTranslator->hasDocumentation(n))
+	|| (doxygen && doxygen_translator->hasDocumentation(n))
       );
   }
 
   /* ------------------------------------------------------------
    * build_combined_docstring()
+   *
    *    Build the full docstring which may be a combination of the
    *    explicit docstring and autodoc string or, if none of them
    *    is specified, obtained by translating Doxygen comment to
@@ -1502,6 +1503,7 @@ public:
    *    Return new string to be deleted by caller (never NIL but
    *    may be empty if there is no docstring).
    * ------------------------------------------------------------ */
+
   String *build_combined_docstring(Node *n, autodoc_t ad_type) {
     String *docstr = Getattr(n, "feature:docstring");
     if (docstr && Len(docstr)) {
@@ -1514,14 +1516,14 @@ public:
     }
 
     if (Getattr(n, "feature:autodoc") && !GetFlag(n, "feature:noautodoc")) {
-      String* autodoc = make_autodoc(n, ad_type);
+      String *autodoc = make_autodoc(n, ad_type);
       if (autodoc && Len(autodoc) > 0) {
 	if (docstr && Len(docstr)) {
 	  Append(autodoc, "\n");
 	  Append(autodoc, docstr);
 	}
 
-	String* tmp = autodoc;
+	String *tmp = autodoc;
 	autodoc = docstr;
 	docstr = tmp;
       }
@@ -1532,8 +1534,8 @@ public:
     if (!docstr || !Len(docstr)) {
       if (doxygen) {
 	docstr = Getattr(n, "python:docstring");
-	if (!docstr && doxygenTranslator->hasDocumentation(n)) {
-	  docstr = doxygenTranslator->getDocumentation(n);
+	if (!docstr && doxygen_translator->hasDocumentation(n)) {
+	  docstr = doxygen_translator->getDocumentation(n);
 
 	  // Avoid rebuilding it again the next time: notice that we can't do
 	  // this for the combined doc string as autodoc part of it depends on
@@ -1588,8 +1590,7 @@ public:
    *	source code (but without quotes around it).
    * ------------------------------------------------------------ */
 
-  String *cdocstring(Node *n, autodoc_t ad_type)
-  {
+  String *cdocstring(Node *n, autodoc_t ad_type) {
     String *ds = build_combined_docstring(n, ad_type);
     Replaceall(ds, "\\", "\\\\");
     Replaceall(ds, "\"", "\\\"");
@@ -4200,7 +4201,7 @@ public:
 
 	Printf(f_shadow, ":\n");
 
-	// write docstrings if requested
+	// Write docstrings if requested
 	if (have_docstring(n)) {
 	  String *str = docstring(n, AUTODOC_CLASS);
 	  if (str && Len(str))

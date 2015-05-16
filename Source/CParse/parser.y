@@ -60,57 +60,61 @@ static int      template_reduce = 0;
 static int      cparse_externc = 0;
 int		ignore_nested_classes = 0;
 int		kwargs_supported = 0;
+
 /* -----------------------------------------------------------------------------
  *                            Doxygen Comment Globals and Assist Functions
  * ----------------------------------------------------------------------------- */
+
 static String *currentDeclComment = NULL; /* Comment of C/C++ declaration. */
 static Node *previousNode = NULL; /* Pointer to the previous node (for post comments) */
 static Node *currentNode = NULL; /* Pointer to the current node (for post comments) */
 
-int isStructuralDoxygen(String *s){
-	static const char* const structuralTags[] = {
-	  "addtogroup",
-	  "callgraph",
-	  "callergraph",
-	  "category",
-	  "def",
-	  "defgroup",
-	  "dir",
-	  "example",
-	  "file",
-	  "headerfile",
-	  "internal",
-	  "mainpage",
-	  "name",
-	  "nosubgrouping",
-	  "overload",
-	  "package",
-	  "page",
-	  "protocol",
-	  "relates",
-	  "relatesalso",
-	  "showinitializer",
-	  "weakgroup",
-	};
+int is_structural_doxygen(String *s) {
+  static const char* const structuralTags[] = {
+    "addtogroup",
+    "callgraph",
+    "callergraph",
+    "category",
+    "def",
+    "defgroup",
+    "dir",
+    "example",
+    "file",
+    "headerfile",
+    "internal",
+    "mainpage",
+    "name",
+    "nosubgrouping",
+    "overload",
+    "package",
+    "page",
+    "protocol",
+    "relates",
+    "relatesalso",
+    "showinitializer",
+    "weakgroup"
+  };
 
-	unsigned n;
-	char *slashPointer = Strchr(s, '\\');
-	char *atPointer = Strchr(s,'@');
-	if (slashPointer == NULL && atPointer == NULL) return 0;
-	else if( slashPointer == NULL) slashPointer = atPointer;
+  unsigned int i;
+  char *slashPointer = Strchr(s, '\\');
+  char *atPointer = Strchr(s,'@');
+  if (slashPointer == NULL && atPointer == NULL)
+    return 0;
+  else if (slashPointer == NULL)
+    slashPointer = atPointer;
 
-	slashPointer++; /* skip backslash or at sign */
+  slashPointer++; /* skip backslash or at sign */
 
-	for (n = 0; n < sizeof(structuralTags)/sizeof(structuralTags[0]); n++) {
-	  const size_t len = strlen(structuralTags[n]);
-	  if (strncmp(slashPointer, structuralTags[n], len) == 0) {
-	    /* Take care to avoid false positives with prefixes of other tags. */
-	    if (slashPointer[len] == '\0' || isspace(slashPointer[len]))
-	      return 1;
-	  }
-	}
+  for (i = 0; i < sizeof(structuralTags) / sizeof(structuralTags[0]); i++) {
+    const size_t len = strlen(structuralTags[i]);
+    if (strncmp(slashPointer, structuralTags[i], len) == 0) {
+      /* Take care to avoid false positives with prefixes of other tags. */
+      if (slashPointer[len] == '\0' || isspace(slashPointer[len]))
+	return 1;
+    }
+  }
 
-	return 0;
+  return 0;
 }
 
 /* -----------------------------------------------------------------------------
@@ -220,16 +224,16 @@ static void set_comment(Node *n, String *comment) {
   if (!n || !comment)
     return;
 
-  if (Getattr(n, "doxygen"))
+  if (Getattr(n, "doxygen")) {
     Append(Getattr(n, "doxygen"), comment);
-  else {
+  } else {
     Setattr(n, "doxygen", comment);
     /* This is the first comment, populate it with @params, if any */
     p = Getattr(n, "parms");
     while (p) {
       if (Getattr(p, "doxygen"))
 	Printv(comment, "\n@param ", Getattr(p, "name"), Getattr(p, "doxygen"), NIL);
-      p=nextSibling(p);
+      p = nextSibling(p);
     }
   }
   
@@ -1598,8 +1602,8 @@ program        :  interface {
 interface      : interface declaration {  
                    /* add declaration to end of linked list (the declaration isn't always a single declaration, sometimes it is a linked list itself) */
                    if (currentDeclComment != NULL) {
-                       set_comment($2, currentDeclComment);
-                       currentDeclComment = NULL;
+		     set_comment($2, currentDeclComment);
+		     currentDeclComment = NULL;
                    }                                      
                    appendChild($1,$2);
                    $$ = $1;
@@ -1611,7 +1615,7 @@ interface      : interface declaration {
                | interface doxygen_post_comment {
                    Node *node = lastChild($1);
                    if (node) {
-                       set_comment(node, $2);
+		     set_comment(node, $2);
                    }
                    $$ = $1;
                }
@@ -3476,7 +3480,7 @@ doxygen_comment_item : DOXYGENSTRING {
 		  DohReplace($1, "*/", "", 0);
 
 		  /* Throw out all structural comments */
-		  if (isStructuralDoxygen($1)) {
+		  if (is_structural_doxygen($1)) {
 		    Delete($1);
 		    $1 = 0;
 		  }
@@ -4891,7 +4895,11 @@ rawparms          : parm ptail {
                   set_nextSibling($1,$2);
                   $$ = $1;
 		}
-               | empty { $$ = 0; previousNode = currentNode; currentNode=0; }
+               | empty {
+		  $$ = 0;
+		  previousNode = currentNode;
+		  currentNode=0;
+	       }
                ;
 
 ptail          : COMMA parm ptail {
@@ -6082,7 +6090,11 @@ edecl          :  identifier {
 		   $$ = $1;
 		   set_comment($1, $2);
 		 }
-                 | empty { $$ = 0; previousNode = currentNode; currentNode = 0; }
+                 | empty {
+		   $$ = 0;
+		   previousNode = currentNode;
+		   currentNode = 0;
+		 }
                  ;
 
 etype            : expr {

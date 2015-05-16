@@ -139,8 +139,7 @@ int Dispatcher::emit_one(Node *n) {
     ret = namespaceDeclaration(n);
   } else if (strcmp(tag, "template") == 0) {
     ret = templateDeclaration(n);
-  }
-  else if (strcmp(tag, "doxycomm") == 0) {
+  } else if (strcmp(tag, "doxycomm") == 0) {
     ret = doxygenComment(n);
   } else if (strcmp(tag, "lambda") == 0) {
     ret = lambdaDeclaration(n);
@@ -310,7 +309,7 @@ int Dispatcher::usingDeclaration(Node *n) {
 int Dispatcher::namespaceDeclaration(Node *n) {
   return defaultHandler(n);
 }
-int Dispatcher::doxygenComment(Node *n){
+int Dispatcher::doxygenComment(Node *n) {
   return defaultHandler(n);
 }
 
@@ -340,8 +339,7 @@ directors(0) {
   director_language = 0;
   assert(!this_);
   this_ = this;
-
-  doxygenTranslator = NULL;
+  doxygen_translator = NULL;
 }
 
 Language::~Language() {
@@ -2972,6 +2970,7 @@ int Language::usingDeclaration(Node *n) {
 /* ----------------------------------------------------------------------
  * Language::doxygenComment()
  * ---------------------------------------------------------------------- */
+
 int Language::doxygenComment(Node *n){
 	
   String *comment = Getattr(n, "comment");

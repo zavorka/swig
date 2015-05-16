@@ -354,7 +354,7 @@ protected:
   int director_language;
 
   /* Used to translate Doxygen comments to target documentation format */
-  class DoxygenTranslator *doxygenTranslator;
+  class DoxygenTranslator *doxygen_translator;
 
 private:
   Hash *symtabs; /* symbol tables */
