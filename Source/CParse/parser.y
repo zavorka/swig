@@ -65,12 +65,12 @@ int		kwargs_supported = 0;
  *                            Doxygen Comment Globals and Assist Functions
  * ----------------------------------------------------------------------------- */
 
-static String *currentDeclComment = NULL; /* Comment of C/C++ declaration. */
-static Node *previousNode = NULL; /* Pointer to the previous node (for post comments) */
-static Node *currentNode = NULL; /* Pointer to the current node (for post comments) */
+static String *current_comment = NULL; /* Comment of C/C++ declaration. */
+static Node *previous_node = NULL; /* Pointer to the previous node (for post comments) */
+static Node *current_node = NULL; /* Pointer to the current node (for post comments) */
 
-int is_structural_doxygen(String *s) {
-  static const char* const structuralTags[] = {
+static int is_structural_doxygen(String *s) {
+  static const char* const structural_tags[] = {
     "addtogroup",
     "callgraph",
     "callergraph",
@@ -94,22 +94,22 @@ int is_structural_doxygen(String *s) {
     "showinitializer",
     "weakgroup"
   };
-
   unsigned int i;
-  char *slashPointer = Strchr(s, '\\');
-  char *atPointer = Strchr(s,'@');
-  if (slashPointer == NULL && atPointer == NULL)
+  char *slash = Strchr(s, '\\');
+  char *at = Strchr(s, '@');
+
+  if (slash == NULL && at == NULL)
     return 0;
-  else if (slashPointer == NULL)
-    slashPointer = atPointer;
+  else if (slash == NULL)
+    slash = at;
 
-  slashPointer++; /* skip backslash or at sign */
+  slash++; /* skip backslash or at sign */
 
-  for (i = 0; i < sizeof(structuralTags) / sizeof(structuralTags[0]); i++) {
-    const size_t len = strlen(structuralTags[i]);
-    if (strncmp(slashPointer, structuralTags[i], len) == 0) {
+  for (i = 0; i < sizeof(structural_tags) / sizeof(structural_tags[0]); i++) {
+    const size_t len = strlen(structural_tags[i]);
+    if (strncmp(slash, structural_tags[i], len) == 0) {
       /* Take care to avoid false positives with prefixes of other tags. */
-      if (slashPointer[len] == '\0' || isspace(slashPointer[len]))
+      if (slash[len] == '\0' || isspace(slash[len]))
 	return 1;
     }
   }
@@ -134,8 +134,8 @@ static Node *new_node(const_String_or_char_ptr tag) {
   Setfile(n,cparse_file);
   Setline(n,cparse_line);
   /* Remember the previous node in case it will need a post-comment */
-  previousNode = currentNode;
-  currentNode = n;
+  previous_node = current_node;
+  current_node = n;
   return n;
 }
 
@@ -1601,15 +1601,15 @@ program        :  interface {
 
 interface      : interface declaration {  
                    /* add declaration to end of linked list (the declaration isn't always a single declaration, sometimes it is a linked list itself) */
-                   if (currentDeclComment != NULL) {
-		     set_comment($2, currentDeclComment);
-		     currentDeclComment = NULL;
+                   if (current_comment != NULL) {
+		     set_comment($2, current_comment);
+		     current_comment = NULL;
                    }                                      
                    appendChild($1,$2);
                    $$ = $1;
                }
                | interface doxygen_comment {
-                   currentDeclComment = $2; 
+                   current_comment = $2; 
                    $$ = $1;
                }
                | interface doxygen_post_comment {
@@ -4897,8 +4897,8 @@ rawparms          : parm ptail {
 		}
                | empty {
 		  $$ = 0;
-		  previousNode = currentNode;
-		  currentNode=0;
+		  previous_node = current_node;
+		  current_node=0;
 	       }
                ;
 
@@ -4907,7 +4907,7 @@ ptail          : COMMA parm ptail {
 		 $$ = $2;
                 }
 	       | COMMA doxygen_post_comment parm ptail {
-		 set_comment(previousNode, $2);
+		 set_comment(previous_node, $2);
                  set_nextSibling($3,$4);
 		 $$ = $3;
                }
@@ -4918,8 +4918,8 @@ ptail          : COMMA parm ptail {
 parm           : rawtype parameter_declarator {
                    SwigType_push($1,$2.type);
 		   $$ = NewParmWithoutFileLineInfo($1,$2.id);
-		   previousNode = currentNode;
-		   currentNode = $$;
+		   previous_node = current_node;
+		   current_node = $$;
 		   Setfile($$,cparse_file);
 		   Setline($$,cparse_line);
 		   if ($2.defarg) {
@@ -4929,8 +4929,8 @@ parm           : rawtype parameter_declarator {
 
                 | TEMPLATE LESSTHAN cpptype GREATERTHAN cpptype idcolon def_args {
                   $$ = NewParmWithoutFileLineInfo(NewStringf("template<class> %s %s", $5,$6), 0);
-		  previousNode = currentNode;
-		  currentNode = $$;
+		  previous_node = current_node;
+		  current_node = $$;
 		  Setfile($$,cparse_file);
 		  Setline($$,cparse_line);
                   if ($7.val) {
@@ -4940,8 +4940,8 @@ parm           : rawtype parameter_declarator {
                 | PERIOD PERIOD PERIOD {
 		  SwigType *t = NewString("v(...)");
 		  $$ = NewParmWithoutFileLineInfo(t, 0);
-		  previousNode = currentNode;
-		  currentNode = $$;
+		  previous_node = current_node;
+		  current_node = $$;
 		  Setfile($$,cparse_file);
 		  Setline($$,cparse_line);
 		}
@@ -6084,7 +6084,7 @@ edecl          :  identifier {
 		 }
 		 | doxygen_post_comment edecl {
 		   $$ = $2;
-		   set_comment(previousNode, $1);
+		   set_comment(previous_node, $1);
 		 }
 		 | edecl doxygen_post_comment {
 		   $$ = $1;
@@ -6092,8 +6092,8 @@ edecl          :  identifier {
 		 }
                  | empty {
 		   $$ = 0;
-		   previousNode = currentNode;
-		   currentNode = 0;
+		   previous_node = current_node;
+		   current_node = 0;
 		 }
                  ;
 
